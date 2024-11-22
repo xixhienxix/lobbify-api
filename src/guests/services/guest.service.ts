@@ -223,9 +223,28 @@ export class GuestService {
       })
       .exec();
 
+    // const disponibilidad = await dispoquery.then((doc: any) => {
+    //   for (let i = 0; i < doc.length; i++) {
+    //     sinDisponibilidad.push(doc[i]._doc.numeroCuarto);
+    //   }
+    //   return sinDisponibilidad;
+    // });
+
     const disponibilidad = await dispoquery.then((doc: any) => {
+      console.log('doc', doc);
       for (let i = 0; i < doc.length; i++) {
-        sinDisponibilidad.push(doc[i]._doc.numeroCuarto);
+        const salidaDate = new Date(doc[i]._doc.salida);
+        const initialDate = new Date(busqueda.initialDate);
+
+        // Check if the dates match (same day)
+        const isSameDay =
+          salidaDate.toISOString().split('T')[0] ===
+          initialDate.toISOString().split('T')[0];
+
+        // If salida date is the same day as busqueda.initialDate, skip adding to sinDisponibilidad
+        if (!isSameDay) {
+          sinDisponibilidad.push(doc[i]._doc.numeroCuarto);
+        }
       }
       return sinDisponibilidad;
     });
@@ -273,7 +292,7 @@ export class GuestService {
     let updatedFolioNumber = startingFolioNumber;
 
     // Map through the huespedArr to update folios and save documents
-    const updatePromises = huespedArr.map(async (element, index) => {
+    const updatePromises = huespedArr.map(async (element) => {
       updatedFolioNumber += 1; // Increment folio number
       element.folio = `${letraFolio}${updatedFolioNumber}`; // Update folio with the new number
 
