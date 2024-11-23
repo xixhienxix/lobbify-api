@@ -8,6 +8,7 @@ export class LogService {
   constructor(@InjectModel('Log') private logModel: Model<Log>) {}
 
   async getLogsByUser(hotel: string, username: string) {
+    console.log('hotel: hotel, username', hotel, username);
     try {
       return this.logModel
         .find({ hotel: hotel, username })
@@ -28,11 +29,9 @@ export class LogService {
   }
 
   async postLogs(hotel: string, body: any) {
-    console.log('Hotel', hotel);
     body.logEntry.hotel = hotel;
     try {
       const data = await this.logModel.create(body.logEntry);
-      console.log('POST activity', data);
       return data;
     } catch (err) {
       console.error('Error creating log entry', err);

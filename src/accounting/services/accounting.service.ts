@@ -51,24 +51,44 @@ export class AccountingService {
   }
 
   async addHospedaje(hotel: string, body: any): Promise<Edo_Cuenta[]> {
-    const insertedDocumentArray = [];
-    body.edoCuenta[0].hotel = hotel;
+    const insertedDocumentArray: Edo_Cuenta[] = [];
 
-    const result = await this.accountingModel
-      .create(body.edoCuenta[0])
-      .catch((err) => {
-        console.log('Inserting Accounting Error: ', err);
-        return err;
-      });
-    const insertedDocument = await this.accountingModel
-      .findOne({
-        _id: result.insertedId,
-      })
-      .catch((err) => {
-        console.log('Serched Inserted Item', err);
-        return err;
-      });
-    insertedDocumentArray.push(insertedDocument);
+    // Attach the hotel property to each edoCuenta item
+    const edoCuentaArray = body.edoCuenta.map((item: any) => ({
+      ...item,
+      hotel, // Add the hotel name to each item
+    }));
+
+    try {
+      // Insert each document and ensure uniqueness
+      for (const item of edoCuentaArray) {
+        try {
+          // Check if the document already exists to prevent duplicates
+          const existingDocument = await this.accountingModel.findOne({
+            Folio: item.Folio, // Check by unique identifier (e.g., Folio)
+          });
+
+          if (existingDocument) {
+            console.warn(`Document with Folio ${item.Folio} already exists.`);
+            continue; // Skip to the next item
+          }
+
+          // Create the document in the database
+          const createdDocument = await this.accountingModel.create(item);
+
+          // Push the created document to the result array
+          insertedDocumentArray.push(createdDocument);
+        } catch (err) {
+          console.error('Error processing item:', item, err);
+          throw err; // Rethrow the error for external handling
+        }
+      }
+    } catch (error) {
+      console.error('Error inserting edoCuenta array:', error);
+      throw error; // Re-throw the error to the caller
+    }
+
+    console.log('Final insertedDocumentArray:', insertedDocumentArray);
     return insertedDocumentArray;
   }
 

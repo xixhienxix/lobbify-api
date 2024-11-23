@@ -12,7 +12,7 @@
             "runtimeArgs": [
                 "/Users/xixzeroxix/.nvm/versions/node/v18.17.1/bin/npm",
                 "run",
-                "start:dev",
+                "start:debug",
                 "--",
                 "--inspect-brk"
             ],

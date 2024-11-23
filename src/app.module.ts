@@ -49,6 +49,9 @@ import { BloqueosModule } from './bloqueos/bloqueos.module';
         });
         return connection;
       },
+      // MongoDB options
+      retryAttempts: 10, // Retry 10 times
+      retryDelay: 5000, // Retry every 5 seconds
     }),
   ],
   controllers: [AppController],

@@ -28,7 +28,6 @@ export class LogController {
   @UseGuards(RolesUserGuard)
   async postLogs(@Body() body, @Req() request: Request) {
     const hotel = request.headers['hotel'];
-    console.log('posting LogS', body);
     return this._logService.postLogs(hotel, body);
   }
 }

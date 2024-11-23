@@ -141,22 +141,22 @@ export class GuestService {
       .find({
         hotel: hotel,
         $or: [
-          // Case 1: The arrival date of the reservation is within the provided range
           {
+            // Case 1: The arrival date of the reservation is within the provided range
             llegada: {
               $gte: busqueda.initialDate,
               $lt: busqueda.endDate,
             },
           },
-          // Case 2: The departure date of the reservation is within the provided range
           {
+            // Case 2: The departure date of the reservation is within the provided range
             salida: {
               $gt: busqueda.initialDate,
               $lte: busqueda.endDate,
             },
           },
-          // Case 3: The reservation completely encompasses the provided range
           {
+            // Case 3: The reservation completely encompasses the provided range
             llegada: {
               $lt: busqueda.initialDate,
             },
@@ -181,20 +181,41 @@ export class GuestService {
         return err;
       });
 
-    const ini = new Date(busqueda.initialDate);
-    const end = new Date(busqueda.endDate);
+    const normalizeDate = (date: Date) => {
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    };
 
-    console.log('---------------------->>>', busqueda.initialDate);
-    console.log('---------------------->>>', busqueda.endDate);
-    console.log('---------------------->>>', ini);
-    console.log('---------------------->>>', end);
+    const disponibilidad = await dispoquery.then((doc: any) => {
+      console.log('doc', doc);
+      for (let i = 0; i < doc.length; i++) {
+        const salidaDateNormalized = normalizeDate(
+          new Date(doc[i]._doc.salida),
+        );
+        const initialDateNormalized = normalizeDate(
+          new Date(busqueda.initialDate),
+        );
+
+        // Compare normalized dates
+        const isSameDay =
+          salidaDateNormalized.getTime() === initialDateNormalized.getTime();
+
+        console.log('isSameDay:', isSameDay);
+        console.log('salidaDateNormalized:', salidaDateNormalized);
+        console.log('initialDateNormalized:', initialDateNormalized);
+
+        // If salida date is the same as busqueda.initialDate, skip adding to sinDisponibilidad
+        if (!isSameDay) {
+          sinDisponibilidad.push(doc[i]._doc.numeroCuarto);
+        }
+      }
+      return sinDisponibilidad;
+    });
 
     const bloqueosQuery = this.bloqueosModel
       .find({
         hotel: 'Hotel Pokemon',
         $and: [
           {
-            // Checa si hay un solapamiento o si la salida del huésped es igual al "Hasta"
             $or: [
               {
                 Desde: {
@@ -205,7 +226,6 @@ export class GuestService {
                 },
               },
               {
-                // Nueva regla: la salida del huésped es igual a la fecha Hasta de la reserva
                 Hasta: {
                   $eq: new Date(busqueda.endDate),
                 },
@@ -213,7 +233,6 @@ export class GuestService {
             ],
           },
           {
-            // Valida que uno de estos campos sea true
             $or: [
               { 'Estatus.sinLlegadas': true },
               { 'Estatus.fueraDeServicio': true },
@@ -223,36 +242,10 @@ export class GuestService {
       })
       .exec();
 
-    // const disponibilidad = await dispoquery.then((doc: any) => {
-    //   for (let i = 0; i < doc.length; i++) {
-    //     sinDisponibilidad.push(doc[i]._doc.numeroCuarto);
-    //   }
-    //   return sinDisponibilidad;
-    // });
-
-    const disponibilidad = await dispoquery.then((doc: any) => {
-      console.log('doc', doc);
-      for (let i = 0; i < doc.length; i++) {
-        const salidaDate = new Date(doc[i]._doc.salida);
-        const initialDate = new Date(busqueda.initialDate);
-
-        // Check if the dates match (same day)
-        const isSameDay =
-          salidaDate.toISOString().split('T')[0] ===
-          initialDate.toISOString().split('T')[0];
-
-        // If salida date is the same day as busqueda.initialDate, skip adding to sinDisponibilidad
-        if (!isSameDay) {
-          sinDisponibilidad.push(doc[i]._doc.numeroCuarto);
-        }
-      }
-      return sinDisponibilidad;
-    });
-
     const bloqueosDocs = await bloqueosQuery;
     for (const doc2 of bloqueosDocs) {
       if (doc2.Cuarto && Array.isArray(doc2.Cuarto)) {
-        sinDisponibilidad.push(...doc2.Cuarto); // Add all Cuarto values to the list
+        sinDisponibilidad.push(...doc2.Cuarto);
       }
     }
 
@@ -267,42 +260,31 @@ export class GuestService {
       return { message: 'No hay información de huespedes para procesar' };
     }
 
-    // Get the initial folio details from Foliador
-    const letraFolio = huespedArr[0].folio.split(/\d+/)[0];
-    const filter = { hotel: hotel, Letra: letraFolio };
-    let foliador;
+    // Get the letter from the first folio
+    const firstFolio = huespedArr[0]?.folio ?? '';
+    const letra = firstFolio.charAt(0);
 
-    try {
-      foliador = await this.foliadorModel.findOne(filter);
-      if (!foliador) {
-        return {
-          message:
-            'Foliador no encontrado para el hotel y letra proporcionados',
-        };
-      }
-    } catch (err) {
-      console.log('Error fetching foliador:', err);
-      return {
-        message: 'Error al obtener información de foliador',
-        error: err,
-      };
+    // Validate all folios share the same letter
+    if (!huespedArr.every((huesped) => huesped.folio.charAt(0) === letra)) {
+      return { message: 'Los folios no comparten la misma letra inicial' };
     }
 
-    const startingFolioNumber = parseInt(foliador.Folio.replace(/\D/g, ''));
-    let updatedFolioNumber = startingFolioNumber;
+    // Find the maximum folio number in the huespedArr
+    const maxFolioNumber = Math.max(
+      ...huespedArr.map((huesped) => parseInt(huesped.folio.substring(1), 10)),
+    );
 
-    // Map through the huespedArr to update folios and save documents
+    console.log('maxFolioNumber: ', maxFolioNumber);
+
+    const filter = { hotel: hotel, Letra: letra };
+
+    // Map through huespedArr to create records for each guest
     const updatePromises = huespedArr.map(async (element) => {
-      updatedFolioNumber += 1; // Increment folio number
-      element.folio = `${letraFolio}${updatedFolioNumber}`; // Update folio with the new number
-
       const huesped = { ...element, hotel };
-
       try {
         const data = await this.guestModel.create(huesped);
-        console.log('data returned from update query:', data);
         if (!data) {
-          return { message: 'No se pudo crear la reserva, intente mas tarde' };
+          return { message: 'No se pudo crear la reserva, intente más tarde' };
         }
         addedDocuments.push(data);
         return { message: 'Habitación creada con éxito' };
@@ -315,16 +297,22 @@ export class GuestService {
     // Wait for all guest creation operations to complete
     await Promise.all(updatePromises);
 
-    // Update the Foliador with the new folio number after all guests have been created
-    const update = { Folio: updatedFolioNumber.toString() };
+    // Calculate the new folio number for the Foliador
+    const newFolioNumber = maxFolioNumber + 1;
+    const update = { Folio: `${newFolioNumber}` };
+    console.log('newFolioNumber: ', newFolioNumber);
+    console.log('update: ', update);
 
+    // Update the Foliador in the database
     try {
-      const data = await this.foliadorModel.findOneAndUpdate(filter, update, {
-        new: true,
-      });
-      if (!data) {
+      const foliadorUpdateResult = await this.foliadorModel.findOneAndUpdate(
+        filter,
+        update,
+        { new: true },
+      );
+      if (!foliadorUpdateResult) {
         return {
-          message: 'No se pudo actualizar el folio, intente mas tarde',
+          message: 'No se pudo actualizar el folio, intente más tarde',
           addedDocuments,
         };
       }
