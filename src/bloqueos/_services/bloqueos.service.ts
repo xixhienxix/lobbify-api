@@ -73,4 +73,15 @@ export class BloqueosService {
       };
     }
   }
+
+  async deleteBloqueo(bloqueoId: string): Promise<any> {
+    try {
+      const result = await this.bloqueosModel
+        .deleteOne({ _id: bloqueoId })
+        .exec();
+      return result;
+    } catch (err) {
+      throw new Error('Error deleting Bloqueo');
+    }
+  }
 }

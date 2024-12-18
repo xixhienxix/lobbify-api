@@ -29,6 +29,10 @@ export class Parametros {
   autoCheckOut: boolean;
   @Prop()
   noShowAutoUpdated: boolean;
+  @Prop()
+  inventario: number;
+  @Prop()
+  iddleTimer: number;
 }
 
 export const ParametrosSchema = SchemaFactory.createForClass(Parametros);

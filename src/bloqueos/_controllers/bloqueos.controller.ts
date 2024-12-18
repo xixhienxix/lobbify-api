@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpException,
+  HttpStatus,
   Param,
   Post,
-  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -28,5 +30,23 @@ export class BloqueosController {
   async postReservaton(@Body() body, @Req() request: Request) {
     const hotel = request.headers['hotel'];
     return this._BloqueosService.createBloqueo(hotel, body);
+  }
+
+  @Delete('/reportes/borrar-bloqueo/:id')
+  @UseGuards(RolesUserGuard)
+  async deleteBloqueo(@Param('id') bloqueoId: string): Promise<any> {
+    console.log('DELETEM BLOQUEOS');
+    try {
+      const result = await this._BloqueosService.deleteBloqueo(bloqueoId);
+      if (result.deletedCount === 0) {
+        throw new HttpException('Bloqueo not found', HttpStatus.NOT_FOUND);
+      }
+      return {
+        message: 'Bloqueo deleted!',
+        bloqueo: result,
+      };
+    } catch (err) {
+      throw new HttpException(err.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }
