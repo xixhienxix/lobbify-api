@@ -19,5 +19,7 @@ export class Bloqueos {
   Comentarios: string;
   @Prop()
   hotel: string;
+  @Prop()
+  Completed: boolean;
 }
 export const BloqueosSchema = SchemaFactory.createForClass(Bloqueos);

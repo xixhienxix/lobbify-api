@@ -1,12 +1,12 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   HttpException,
   HttpStatus,
   Param,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -32,7 +32,7 @@ export class BloqueosController {
     return this._BloqueosService.createBloqueo(hotel, body);
   }
 
-  @Delete('/reportes/borrar-bloqueo/:id')
+  @Put('/reportes/borrar-bloqueo/:id')
   @UseGuards(RolesUserGuard)
   async deleteBloqueo(@Param('id') bloqueoId: string): Promise<any> {
     console.log('DELETEM BLOQUEOS');

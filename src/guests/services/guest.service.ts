@@ -135,7 +135,6 @@ export class GuestService {
   async getDisponibilidad(hotel: string, params: any): Promise<any> {
     const busqueda = params.params;
     const sinDisponibilidad = [];
-    console.log('busqueda: ', busqueda);
 
     const dispoquery = this.guestModel
       .find({
@@ -233,6 +232,9 @@ export class GuestService {
             ],
           },
           {
+            Completed: false,
+          },
+          {
             $or: [
               { 'Estatus.sinLlegadas': true },
               { 'Estatus.fueraDeServicio': true },
@@ -248,7 +250,6 @@ export class GuestService {
         sinDisponibilidad.push(...doc2.Cuarto);
       }
     }
-
     return disponibilidad;
   }
 

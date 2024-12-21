@@ -76,8 +76,16 @@ export class BloqueosService {
 
   async deleteBloqueo(bloqueoId: string): Promise<any> {
     try {
+      console.log('Borrando:', bloqueoId);
       const result = await this.bloqueosModel
-        .deleteOne({ _id: bloqueoId })
+        .updateOne(
+          { _id: bloqueoId },
+          {
+            $set: {
+              Completed: true,
+            },
+          },
+        )
         .exec();
       return result;
     } catch (err) {
