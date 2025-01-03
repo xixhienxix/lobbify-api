@@ -172,7 +172,7 @@ export class AccountingService {
   async updateBalance(hotel: string, body: any): Promise<Edo_Cuenta[]> {
     return this.accountingModel
       .findOneAndUpdate(
-        { _id: body._id, hotel: hotel },
+        { Folio: body.folio, hotel: hotel },
         { $set: { Cargo: body.monto } },
       )
       .then((data) => {

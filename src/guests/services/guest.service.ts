@@ -90,7 +90,7 @@ export class GuestService {
             llegada: data.data.StartTime,
             salida: data.data.EndTime,
             noches: data.data.stayNights,
-            tarifa: data.data.tarifaSeleccionada[0].Tarifa,
+            tarifa: data.data.tarifaSeleccionada[0],
             porPagar: data.data.totalSeleccionado,
             pendiente: data.data.totalSeleccionado,
             habitacion: data.data.cuarto,

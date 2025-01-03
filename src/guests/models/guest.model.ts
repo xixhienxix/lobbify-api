@@ -22,8 +22,8 @@ export class huespeds {
   salida: string;
   @Prop()
   noches: number;
-  @Prop()
-  tarifa: string;
+  @Prop({ type: Object })
+  tarifa: any;
   @Prop()
   porPagar: number;
   @Prop()
