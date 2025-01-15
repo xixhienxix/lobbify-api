@@ -33,6 +33,8 @@ export class Parametros {
   inventario: number;
   @Prop()
   iddleTimer: number;
+  @Prop()
+  maxPersonas: number;
 }
 
 export const ParametrosSchema = SchemaFactory.createForClass(Parametros);

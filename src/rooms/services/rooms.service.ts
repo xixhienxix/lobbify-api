@@ -46,46 +46,33 @@ export class RoomsService {
   }
 
   async postRoom(hotel: string, body: any): Promise<any> {
-    // const filter = { Codigo: body.habitacion.Codigo };
     const filterEdit = {
       Codigo: body.habitacion.Codigo,
-      Numero: body.habitacion.Numero,
     };
-    const update = body.habitacion;
 
+    // Make sure to remove the _id from the update object before calling updateMany
+    const { _id, ...update } = body.habitacion;
+
+    // Check if body.editar is true before proceeding with the update
     if (body.editar === true) {
-      this.habModel
-        .findOne(filterEdit)
-        .then((document) => {
-          if (!document) {
-            throw new Error('No document found with Codigo: 101');
-          }
+      try {
+        const result = await this.habModel.updateMany(filterEdit, update);
 
-          const id = document._id; // Retrieve the _id from the found document
+        // Check if any documents were modified
+        if (result.modifiedCount === 0) {
+          console.log('No documents were updated.');
+          return {
+            message:
+              'No documents were updated, please check your filter criteria.',
+          };
+        }
 
-          // Remove _id from the update object to avoid the CastError
-          const { _id, ...updatedData } = update;
-
-          // Perform the update using the retrieved _id
-          return this.habModel.findByIdAndUpdate(id, updatedData, {
-            new: true,
-          });
-        })
-        .then((updatedDocument) => {
-          if (!updatedDocument) {
-            console.log('No se pudo actualizar los datos, intente más tarde');
-            return {
-              message: 'No se pudo actualizar los datos, intente más tarde',
-            };
-          }
-
-          console.log('Habitación actualizada con éxito');
-          return { message: 'Habitación actualizada con éxito' };
-        })
-        .catch((err) => {
-          console.log('Error during update:', err);
-          return err;
-        });
+        console.log('Documents updated successfully');
+        return { message: 'Documents updated successfully' };
+      } catch (err) {
+        console.log('Error during update:', err);
+        return { message: 'Error during update', error: err };
+      }
     } else {
       const response = [];
       const errors = [];
@@ -96,6 +83,7 @@ export class RoomsService {
             Numero: body.habitacion.Numero[i],
             Descripcion: body.habitacion.Descripcion,
             Tipo: body.habitacion.Tipo,
+            Personas: body.habitacion.Personas,
             Adultos: body.habitacion.Adultos,
             Ninos: body.habitacion.Ninos,
             Vista: body.habitacion.Vista,

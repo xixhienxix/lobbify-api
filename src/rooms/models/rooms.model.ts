@@ -16,6 +16,8 @@ export class room {
   @Prop()
   Camas: number;
   @Prop()
+  Personas: number;
+  @Prop()
   Adultos: number;
   @Prop()
   Ninos: number;
