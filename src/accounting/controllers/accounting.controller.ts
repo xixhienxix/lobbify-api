@@ -67,5 +67,12 @@ export class AccountingController {
     return this._AccountingService.updateBalance(hotel, body);
   }
 
+  @Post('/edo_cuenta/totales')
+  @UseGuards(RolesUserGuard)
+  actualizaSaldos(@Req() request: Request, @Body() body) {
+    const hotel = request.headers['hotel'];
+    return this._AccountingService.actualizaTotales(hotel, body);
+  }
+
   ///edo_cuenta/pagos
 }

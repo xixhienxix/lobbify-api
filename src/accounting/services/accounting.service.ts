@@ -2,11 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Edo_Cuenta } from '../models/accounting.model';
+import { huespeds } from 'src/guests/models/guest.model';
 @Injectable()
 export class AccountingService {
   constructor(
     @InjectModel('Edo_Cuenta')
     private readonly accountingModel: Model<Edo_Cuenta>,
+    @InjectModel(huespeds.name) private guestModel: Model<huespeds>,
   ) {}
 
   async getAccounts(hotel: string, folio: string): Promise<Edo_Cuenta[]> {
@@ -26,27 +28,23 @@ export class AccountingService {
       });
   }
 
-  async addPayment(hotel: string, body: any): Promise<Edo_Cuenta | null> {
+  async addPayment(
+    hotel: string,
+    body: any,
+  ): Promise<{ message: string; data: Edo_Cuenta }> {
     body.edoCuenta.hotel = hotel;
 
     try {
-      //Check if an entry with the same Folio already exists
-      // const existingEntry = await this.accountingModel
-      //   .findOne({ id: body.edoCuenta.id })
-      //   .exec();
-
-      // if (existingEntry) {
-      //   // Return null or handle the case where the entry already exists
-      //   console.log('Entry with the same Folio already exists.');
-      //   return null;
-      // }
-
-      // Create a new entry if it doesn't already exist
       const newEntry = await this.accountingModel.create(body.edoCuenta);
-      return newEntry;
+
+      // Explicitly wrap the created object in a response structure
+      return {
+        message: 'Added',
+        data: newEntry,
+      };
     } catch (err) {
       console.error('Error adding payment:', err);
-      throw err; // Optionally rethrow the error if you want to handle it further up
+      throw err;
     }
   }
 
@@ -186,5 +184,58 @@ export class AccountingService {
       .catch((err) => {
         return err;
       });
+  }
+
+  async actualizaTotales(hotel: string, body: any): Promise<any> {
+    console.log('body:', body.folio);
+
+    try {
+      // Find data matching the folio and hotel
+      const data = await this.accountingModel.find({
+        Folio: body.folio,
+        hotel: hotel,
+      });
+
+      // If no data is found, return an empty array
+      if (!data || data.length === 0) {
+        console.warn('No matching accounting data found');
+        return [];
+      }
+
+      // Calculate the total using reduce
+      const saldoPendiente = this.calculatePendiente(data);
+
+      // Update the model with the calculated total
+      const updatedDocument = await this.guestModel.findOneAndUpdate(
+        { folio: body.folio, hotel: hotel },
+        { $set: { pendiente: saldoPendiente, porPagar: saldoPendiente } },
+        { new: true }, // Return the updated document
+      );
+
+      // If update is successful, return the updated reserva document directly
+      if (updatedDocument) {
+        return [updatedDocument]; // Wrap the updated document in an array
+      } else {
+        console.warn('No matching reserva document found for update');
+        return [];
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      return []; // Return empty array in case of error
+    }
+  }
+
+  calculatePendiente(data: Edo_Cuenta[]): number {
+    if (!data || data.length === 0) {
+      return 0; // Return 0 if the data is undefined or empty
+    }
+    return data.reduce((acc, item) => {
+      if (item?.Estatus === 'Cancelado') {
+        return acc; // Skip this item
+      }
+      const cargo = item?.Cargo ?? 0; // Default to 0 if Cargo is undefined
+      const abono = item?.Abono ?? 0; // Default to 0 if Abono is undefined
+      return acc + cargo - abono; // Accumulate the result
+    }, 0); // Initial value is 0
   }
 }
