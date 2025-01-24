@@ -187,4 +187,38 @@ export class RoomsService {
         return err;
       });
   }
+
+  async agregarHabitacion(hotel: string, body: any): Promise<any> {
+    console.log('Agregar habitaciones', body);
+    const codigo = body.codigoCuarto;
+    const habs = body.habitacionesArr;
+
+    const habData = await this.habModel.find({ Codigo: codigo }).exec();
+
+    if (habData.length === 0) {
+      return 'Habitacion not found'; // If habData does not exist, throw an error
+    }
+
+    // Destructure _id from habData and get the remaining properties for updating
+    const { _id, ...updateData } = habData[0].toObject(); // Convert Mongoose object to plain object
+
+    // Loop through habitacionesArr
+    const roomPromises = habs.map(async (hab: any) => {
+      const newRoom = {
+        ...updateData, // Spread the properties from the first habData object (without _id)
+        Numero: hab, // Replace the Numero with the value from the current item in habs
+      };
+
+      // Add the new room object to the database
+      const addedRoom = new this.habModel(newRoom);
+      await addedRoom.save(); // Save the new room to the database
+
+      return addedRoom; // Optionally, return the added room for further use
+    });
+
+    // Wait for all rooms to be added to the database
+    const addedRooms = await Promise.all(roomPromises);
+
+    return addedRooms; // Return the array of added rooms
+  }
 }

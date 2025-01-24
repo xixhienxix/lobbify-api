@@ -38,6 +38,16 @@ export class RoomsController {
     return this._habitacionService.postRoom(hotel, body);
   }
 
+  @Post('/habitaciones/agregar')
+  @UseGuards(RolesUserGuard)
+  async agregarHabitaciones(
+    @Body() body,
+    @Req() request: Request,
+  ): Promise<any> {
+    const hotel = request.headers['hotel'];
+    return this._habitacionService.agregarHabitacion(hotel, body);
+  }
+
   @Delete('/habitacion/delete/:codigo')
   @UseGuards(RolesUserGuard)
   async deleteRoom(
