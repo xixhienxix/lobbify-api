@@ -120,7 +120,7 @@ export class RoomsService {
     }
   }
 
-  async deleteRoom(hotel: string, codigo: any): Promise<any> {
+  async deleteRoom(hotel: string, codigo: any, numero: string): Promise<any> {
     // const filter = { hotel: hotel, Codigo: codigo };
 
     const huespeds = await this._guestService.findbyCodeAndDate(hotel, codigo);
@@ -130,7 +130,7 @@ export class RoomsService {
     }
 
     await this.habModel
-      .deleteMany({ Codigo: codigo, hotel: hotel })
+      .deleteMany({ Codigo: codigo, Numero: numero, hotel: hotel })
       .then(async (data) => {
         if (data.deletedCount != 0) {
           await this.tarifasModel

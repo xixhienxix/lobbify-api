@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -48,14 +49,15 @@ export class RoomsController {
     return this._habitacionService.agregarHabitacion(hotel, body);
   }
 
-  @Delete('/habitacion/delete/:codigo')
+  @Delete('/habitacion/delete')
   @UseGuards(RolesUserGuard)
   async deleteRoom(
     @Req() request: Request,
-    @Param('codigo') codigo: string,
+    @Query('codigo') codigo: string,
+    @Query('numero') numero: string,
   ): Promise<any> {
     const hotel = request.headers['hotel'];
-    return this._habitacionService.deleteRoom(hotel, codigo);
+    return this._habitacionService.deleteRoom(hotel, codigo, numero);
   }
 
   @Post('update/habitacion/imageurl')
