@@ -4,6 +4,7 @@ import { room } from '../models/rooms.model';
 import { Model } from 'mongoose';
 import { GuestService } from 'src/guests/services/guest.service';
 import { tarifas } from 'src/tarifas/_models/tarifas.model';
+import { reservationStatusMap } from 'src/interfaces/reservation.status';
 @Injectable()
 export class RoomsService {
   constructor(
@@ -124,9 +125,12 @@ export class RoomsService {
     console.log('codigo: ', codigo);
     // const filter = { hotel: hotel, Codigo: codigo };
     try {
+      const excludedStatuses = reservationStatusMap[1];
+
       const huespeds = await this._guestService.findbyCodeAndDate(
         hotel,
         codigo,
+        { estatus: { $nin: excludedStatuses } },
       );
 
       if (huespeds.length > 0) {

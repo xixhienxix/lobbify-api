@@ -64,7 +64,11 @@ export class GuestService {
       });
   }
 
-  async findbyCodeAndDate(hotel: string, code: string): Promise<huespeds[]> {
+  async findbyCodeAndDate(
+    hotel: string,
+    code: string,
+    filter: object = {}, // Optional filter
+  ): Promise<huespeds[]> {
     return this.guestModel.find({
       hotel: hotel,
       habitacion: code,
@@ -78,6 +82,7 @@ export class GuestService {
           new Date(),
         ],
       },
+      ...filter, // Merge the additional filter
     });
   }
 
