@@ -121,49 +121,39 @@ export class RoomsService {
   }
 
   async deleteRoom(hotel: string, codigo: any, numero: string): Promise<any> {
+    console.log('codigo: ', codigo);
     // const filter = { hotel: hotel, Codigo: codigo };
+    try {
+      const huespeds = await this._guestService.findbyCodeAndDate(
+        hotel,
+        codigo,
+      );
 
-    const huespeds = await this._guestService.findbyCodeAndDate(hotel, codigo);
+      if (huespeds.length > 0) {
+        return huespeds.length;
+      }
 
-    if (huespeds.length != 0) {
-      return huespeds.length;
-    }
+      const deleteFilter =
+        numero === 'NN'
+          ? { Codigo: codigo, hotel }
+          : { Codigo: codigo, Numero: numero, hotel };
 
-    await this.habModel
-      .deleteMany({ Codigo: codigo, Numero: numero, hotel: hotel })
-      .then(async (data) => {
-        if (data.deletedCount != 0) {
-          await this.tarifasModel
-            .deleteMany(
-              { Habitacion: codigo, hotel: hotel },
-              { Habitacion$: 1 },
-            )
-            .then(async (data) => {
-              if (!data) {
-                return {
-                  message: 'Failed',
-                };
-              }
-              if (data) {
-                return { message: 'Success' };
-              }
-            })
-            .catch((err) => {
-              return err;
-            });
-        }
-        if (!data) {
-          return {
-            message: 'Failed',
-          };
-        }
-        if (data) {
-          return { message: 'Success' };
-        }
-      })
-      .catch((err) => {
-        return err;
+      console.log('>> Deleted: ', deleteFilter);
+      const roomDeletion = await this.habModel.deleteMany(deleteFilter);
+
+      if (roomDeletion.deletedCount === 0) {
+        console.log('error deletion: ', roomDeletion);
+        return { message: 'Failed' };
+      }
+      const tarifasDeletion = await this.tarifasModel.deleteMany({
+        Habitacion: codigo,
+        hotel,
       });
+
+      return tarifasDeletion ? { message: 'Success' } : { message: 'Failed' };
+    } catch (error) {
+      return { error: error.message || 'An error occurred' };
+    }
   }
 
   async uploadImgToMongo(hotel: string, body: any): Promise<room[]> {

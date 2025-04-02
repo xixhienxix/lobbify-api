@@ -19,6 +19,7 @@ import { PromesasModule } from './promesas/promesas.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { LogModule } from './activitylogs/logs.module';
 import { BloqueosModule } from './bloqueos/bloqueos.module';
+import { PromosModule } from './promos/promos.module';
 
 @Module({
   imports: [
@@ -35,8 +36,9 @@ import { BloqueosModule } from './bloqueos/bloqueos.module';
     ParametrosModule,
     PromesasModule,
     LogModule,
+    PromosModule,
     AccountingModule,
-    MongooseModule.forRoot(environment.MONGODB_CONNECTION_URL, {
+    MongooseModule.forRoot('mongodb://127.0.0.1:27017/MovNext', {
       connectionFactory: (connection) => {
         connection.on('connected', () => {
           console.log('✅ Connected to MongoDB');
