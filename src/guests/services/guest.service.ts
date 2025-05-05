@@ -100,6 +100,7 @@ export class GuestService {
             pendiente: data.data.totalSeleccionado,
             habitacion: data.data.cuarto,
             numeroCuarto: data.data.numeroCuarto,
+            desgloseEdoCuenta: data.data.desgloseEdoCuenta,
           },
         },
       )
@@ -259,6 +260,7 @@ export class GuestService {
   }
 
   async postReservation(hotel: string, body: any): Promise<any> {
+    console.log('Reservacion antes de guardado: ,', body);
     const huespedArr = body.huespedInfo;
     const addedDocuments: any[] = [];
 

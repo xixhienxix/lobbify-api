@@ -38,7 +38,7 @@ import { PromosModule } from './promos/promos.module';
     LogModule,
     PromosModule,
     AccountingModule,
-    MongooseModule.forRoot('mongodb://127.0.0.1:27017/MovNext', {
+    MongooseModule.forRoot(environment.MONGODB_CONNECTION_URL, {
       connectionFactory: (connection) => {
         connection.on('connected', () => {
           console.log('✅ Connected to MongoDB');

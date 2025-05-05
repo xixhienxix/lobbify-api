@@ -73,6 +73,8 @@ export class huespeds {
   estatus_Ama_De_Llaves: string;
   @Prop()
   hotel: string;
+  @Prop({ type: Object })
+  desgloseEdoCuenta: any;
 }
 
 export const GuestSchema = SchemaFactory.createForClass(huespeds);
