@@ -36,9 +36,9 @@ export class Promos {
   @Prop({ type: Date, required: true })
   endDateFCCheckIn: Date; // Add this
   @Prop({ type: Date, required: true })
-  intialValidDateFC: Date;
+  intialDateFC: Date;
   @Prop({ type: Date, required: true })
-  endValidDateFC: Date;
+  endDateFC: Date;
   @Prop()
   hotel: string;
 }

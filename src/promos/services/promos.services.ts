@@ -59,8 +59,8 @@ export class PromosService {
         hotel,
         intialDateFCCheckIn: parseDate(body.data.intialDateFCCheckIn),
         endDateFCCheckIn: parseDate(body.data.endDateFCCheckIn),
-        intialValidDateFC: parseDate(body.data.intialValidDateFC),
-        endValidDateFC: parseDate(body.data.endValidDateFC),
+        intialDateFC: parseDate(body.data.intialDateFC),
+        endDateFC: parseDate(body.data.endDateFC),
       };
       console.log('data:', data);
 
