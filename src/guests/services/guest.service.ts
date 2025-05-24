@@ -177,9 +177,12 @@ export class GuestService {
             ...reservationStatusMap[2],
             ...reservationStatusMap[5],
             ...reservationStatusMap[6],
+          ],
+          $nin: [
+            ...reservationStatusMap[4],
+            ...reservationStatusMap[8],
             ...reservationStatusMap[7],
           ],
-          $nin: [...reservationStatusMap[4], ...reservationStatusMap[8]],
         },
       })
       .catch((err) => {
