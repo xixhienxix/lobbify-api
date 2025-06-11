@@ -405,6 +405,7 @@ export class GuestService {
             habitacion: body.huesped.habitacion,
             notas: body.huesped.notas,
             estatus: body.huesped.estatus,
+            desgloseEdoCuenta: body.huesped.desgloseEdoCuenta,
           },
         },
       )
