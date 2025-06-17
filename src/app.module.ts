@@ -20,9 +20,12 @@ import { AccountingModule } from './accounting/accounting.module';
 import { LogModule } from './activitylogs/logs.module';
 import { BloqueosModule } from './bloqueos/bloqueos.module';
 import { PromosModule } from './promos/promos.module';
-
+import { MailService } from './mail/mail.service';
+import { ConfigModule } from '@nestjs/config';
+import { MailController } from './mail/email.controller';
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
     AuthModule,
     BloqueosModule,
     RoomsModule,
@@ -56,8 +59,8 @@ import { PromosModule } from './promos/promos.module';
       retryDelay: 5000, // Retry every 5 seconds
     }),
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [AppController, MailController],
+  providers: [AppService, MailService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

@@ -125,13 +125,18 @@ export class RoomsService {
     console.log('codigo: ', codigo);
     // const filter = { hotel: hotel, Codigo: codigo };
     try {
-      const excludedStatuses = reservationStatusMap[1];
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0); // ensures we start comparing from midnight UTC
 
       const huespeds = await this._guestService.findbyCodeAndDate(
         hotel,
         codigo,
-        { estatus: { $nin: excludedStatuses } },
+        {
+          $or: [{ llegada: { $gte: today } }, { salida: { $gte: today } }],
+        },
       );
+
+      console.log('huespeds RESULT FROM DELETE filter--->', huespeds);
 
       if (huespeds.length > 0) {
         return huespeds.length;
@@ -149,12 +154,12 @@ export class RoomsService {
         console.log('error deletion: ', roomDeletion);
         return { message: 'Failed' };
       }
-      const tarifasDeletion = await this.tarifasModel.deleteMany({
-        Habitacion: codigo,
-        hotel,
-      });
+      // const tarifasDeletion = await this.tarifasModel.deleteMany({
+      //   Habitacion: codigo,
+      //   hotel,
+      // });
 
-      return tarifasDeletion ? { message: 'Success' } : { message: 'Failed' };
+      return roomDeletion ? { message: 'Success' } : { message: 'Failed' };
     } catch (error) {
       return { error: error.message || 'An error occurred' };
     }
