@@ -137,6 +137,12 @@ export class HuespedDetails {
   notas: string;
   @Prop()
   hotel: string;
+  @Prop()
+  rfc: string;
+  @Prop()
+  cfdi: string;
+  @Prop()
+  razon_social: string;
 }
 
 export const HuespedDetailsSchema =
