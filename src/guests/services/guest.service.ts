@@ -338,9 +338,11 @@ export class GuestService {
 
   async updateHuesped(hotel: string, body: any): Promise<huespeds[]> {
     console.log('update Huesped', body);
+    console.log('update Huesped body.huesped.folio', body.huesped.folio);
+
     return this.guestModel
       .findOneAndUpdate(
-        { folio: body.data.folio, hotel: hotel },
+        { folio: body.huesped.folio, hotel: hotel },
         {
           $set: {
             estatus: body.huesped.estatus,
@@ -466,26 +468,32 @@ export class GuestService {
     return this.huespedDetailsModel
       .findOneAndUpdate(
         {
-          ID_Socio: body.ID_Socio,
+          ID_Socio: body.huesped.ID_Socio,
           hotel: hotel,
         },
         {
           $set: {
-            ID_Socio: body.ID_Socio,
-            Nombre: body.Nombre,
-            email: body.email,
-            telefono: body.telefono,
-            tipoHuesped: body.tipoHuesped,
-            fechaNacimiento: body.fechaNacimiento,
-            trabajaEn: body.trabajaEn,
-            tipoDeID: body.tipoDeID,
-            numeroDeID: body.numeroDeID,
-            direccion: body.direccion,
-            pais: body.pais,
-            ciudad: body.ciudad,
-            codigoPostal: body.codigoPostal,
-            lenguaje: body.lenguaje,
-            notas: body.notas,
+            ID_Socio: body.huesped.ID_Socio,
+            Nombre: body.huesped.Nombre,
+            email: body.huesped.email,
+            telefono: body.huesped.telefono,
+            tipoHuesped: body.huesped.tipoHuesped,
+            fechaNacimiento: body.huesped.fechaNacimiento
+              ? new Date(
+                  body.huesped.fechaNacimiento.year,
+                  body.huesped.fechaNacimiento.month - 1,
+                  body.huesped.fechaNacimiento.day,
+                )
+              : null,
+            trabajaEn: body.huesped.trabajaEn,
+            tipoDeID: body.huesped.tipoDeID,
+            numeroDeID: body.huesped.numeroDeID,
+            direccion: body.huesped.direccion,
+            pais: body.huesped.pais,
+            ciudad: body.huesped.ciudad,
+            codigoPostal: body.huesped.codigoPostal,
+            lenguaje: body.huesped.lenguaje,
+            notas: body.huesped.notas,
           },
         },
         { upsert: true },

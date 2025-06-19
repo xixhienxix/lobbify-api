@@ -116,7 +116,7 @@ export class HuespedDetails {
   @Prop()
   tipoHuesped: string;
   @Prop()
-  fechaNacimiento: string;
+  fechaNacimiento: Date;
   @Prop()
   trabajaEn: string;
   @Prop()
