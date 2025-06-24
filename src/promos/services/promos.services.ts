@@ -43,7 +43,7 @@ export class PromosService {
       if (existingPromo) {
         return {
           success: false,
-          message: `Promo with codigo '${codigo}' already exists.`,
+          message: `La Promoción con el codigo:  '${codigo}' ya existe, utilize un codigo diferente.`,
           exist: true,
         };
       }
@@ -80,5 +80,25 @@ export class PromosService {
         error: error.message,
       };
     }
+  }
+
+  deletePromo(_id): Promise<any> {
+    return this.promosModel
+      .deleteOne({
+        _id: _id,
+      })
+      .then((data) => {
+        console.log(data);
+        if (!data) {
+          return;
+        }
+        if (data) {
+          return data;
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+        return err;
+      });
   }
 }

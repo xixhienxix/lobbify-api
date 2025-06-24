@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { PromosService } from '../services/promos.services';
 import { RolesUserGuard } from 'src/guards/roles.user.guard';
 
@@ -20,5 +29,11 @@ export class PromosController {
     const hotel = request.headers['hotel'];
 
     return this._promosService.createPromos(hotel, body);
+  }
+
+  @Delete('/promos/:_id')
+  @UseGuards(RolesUserGuard)
+  async deletePromo(@Param() _id): Promise<any> {
+    return this._promosService.deletePromo(_id);
   }
 }

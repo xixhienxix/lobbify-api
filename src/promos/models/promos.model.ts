@@ -8,11 +8,15 @@ export class Promos {
   @Prop()
   tipo: number;
   @Prop()
+  estado: boolean;
+  @Prop()
   nombre: string;
   @Prop()
   codigo: string;
   @Prop()
   qtyPrecio: number;
+  @Prop()
+  discountType: boolean;
   @Prop()
   inventario: number;
   @Prop()
@@ -31,6 +35,8 @@ export class Promos {
   stay: number;
   @Prop()
   selectedDays: string[];
+  @Prop()
+  habs: string[];
   @Prop({ type: Date, required: true })
   intialDateFCCheckIn: Date; // Add this
   @Prop({ type: Date, required: true })
