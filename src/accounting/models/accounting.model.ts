@@ -31,6 +31,8 @@ export class Edo_Cuenta {
   Autorizo: string;
   @Prop()
   hotel: string;
+  @Prop()
+  Cajero: string;
 }
 
 export const EdoCuentaSchema = SchemaFactory.createForClass(Edo_Cuenta);
