@@ -75,7 +75,6 @@ export class TarifasService {
           };
         }
         if (data) {
-          console.log('Agregada con exito: ', data);
           return { message: 'Tarifa generada con exito' };
         }
       })
@@ -103,7 +102,6 @@ export class TarifasService {
           };
         }
         if (data) {
-          console.log('Agregada con exito: ', data);
           return { message: 'Tarifa generada con exito' };
         }
       })
@@ -139,7 +137,6 @@ export class TarifasService {
           };
         }
         if (data) {
-          console.log('Agregada con exito: ', data);
           return { message: 'Tarifa generada con exito' };
         }
       })
@@ -159,7 +156,6 @@ export class TarifasService {
         _id: _id,
       })
       .then((data) => {
-        console.log(data);
         if (!data) {
           return;
         }

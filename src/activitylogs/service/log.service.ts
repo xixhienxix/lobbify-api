@@ -8,7 +8,6 @@ export class LogService {
   constructor(@InjectModel('Log') private logModel: Model<Log>) {}
 
   async getLogsByUser(hotel: string, username: string) {
-    console.log('hotel: hotel, username', hotel, username);
     try {
       return this.logModel
         .find({ hotel: hotel, username })

@@ -8,7 +8,7 @@ export class Edo_Cuenta {
   @Prop()
   Folio: string;
   @Prop()
-  Fecha: Date;
+  Fecha: string;
   @Prop()
   Fecha_Cancelado: string;
   @Prop()

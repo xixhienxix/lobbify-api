@@ -36,7 +36,6 @@ export class ParametrosService {
       const newParametros = new this.parametrosModel(body.parametros);
       const data = await newParametros.save();
 
-      console.log(data); // Log the newly created document
       return data;
     } catch (err) {
       console.log(err); // Log any errors that occur

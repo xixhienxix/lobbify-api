@@ -38,12 +38,6 @@ export class DisponibilidadService {
   }
 
   async getDisponibilidadBooking(params): Promise<disponibilidad[]> {
-    console.log(params);
-    const llegadaIsoDate = new Date(params.fechaInicial).toISOString();
-    const salidaIsoDate = new Date(params.fechaFinal).toISOString();
-    console.log('llegadaIsoDate', llegadaIsoDate);
-    console.log('salidaIsoDate', salidaIsoDate);
-
     return this.dispoModel
       .find({
         Llegada: {
@@ -53,7 +47,6 @@ export class DisponibilidadService {
         hotel: params.hotel,
       })
       .then((data) => {
-        console.log('dataResponse', data);
         if (!data) {
           return;
         }

@@ -33,6 +33,9 @@ export class GuestsController {
   @UseGuards(RolesUserGuard)
   async getDisponibilidad(@Body() body, @Req() request: Request) {
     const hotel = request.headers['hotel'];
+    console.log(
+      `[${new Date().toISOString()}] [START] Controller received request`,
+    );
     return this._GuestService.getDisponibilidad(hotel, body);
   }
 
@@ -64,7 +67,6 @@ export class GuestsController {
     @Param('folio') folio,
   ): Promise<any> {
     const hotel = request.headers['hotel'];
-    console.log('Query:', folio);
     return this._GuestService.findPromesas(hotel, folio);
   }
 

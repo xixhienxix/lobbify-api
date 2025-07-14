@@ -61,14 +61,12 @@ export class RoomsService {
 
         // Check if any documents were modified
         if (result.modifiedCount === 0) {
-          console.log('No documents were updated.');
           return {
             message:
               'No documents were updated, please check your filter criteria.',
           };
         }
 
-        console.log('Documents updated successfully');
         return { message: 'Documents updated successfully' };
       } catch (err) {
         console.log('Error during update:', err);
@@ -122,7 +120,6 @@ export class RoomsService {
   }
 
   async deleteRoom(hotel: string, codigo: any, numero: string): Promise<any> {
-    console.log('codigo: ', codigo);
     // const filter = { hotel: hotel, Codigo: codigo };
     try {
       const today = new Date();
@@ -136,8 +133,6 @@ export class RoomsService {
         },
       );
 
-      console.log('huespeds RESULT FROM DELETE filter--->', huespeds);
-
       if (huespeds.length > 0) {
         return huespeds.length;
       }
@@ -147,7 +142,6 @@ export class RoomsService {
           ? { Codigo: codigo, hotel }
           : { Codigo: codigo, Numero: numero, hotel };
 
-      console.log('>> Deleted: ', deleteFilter);
       const roomDeletion = await this.habModel.deleteMany(deleteFilter);
 
       if (roomDeletion.deletedCount === 0) {
@@ -188,7 +182,6 @@ export class RoomsService {
   }
 
   async agregarHabitacion(hotel: string, body: any): Promise<any> {
-    console.log('Agregar habitaciones', body);
     const codigo = body.codigoCuarto;
     const habs = body.habitacionesArr;
 

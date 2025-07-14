@@ -28,7 +28,6 @@ export class HouseKeepingService {
   }
 
   async updateEstatus(hotel: string, body: any) {
-    console.log(body);
     return this.roomsModel
       .findOneAndUpdate(
         { hotel: hotel, Numero: body.cuarto },
@@ -40,11 +39,9 @@ export class HouseKeepingService {
       )
       .then((data) => {
         if (!data) {
-          console.log(data);
           return;
         }
         if (data) {
-          console.log(data);
           return data;
         }
       })

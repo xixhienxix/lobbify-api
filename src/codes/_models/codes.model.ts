@@ -1,23 +1,41 @@
 import { SchemaFactory, Schema, Prop } from '@nestjs/mongoose';
 import * as mongoose from 'mongoose';
+import { IsString, IsNotEmpty } from 'class-validator';
 
 export type CodesDocument = mongoose.HydratedDocument<code>; //<name of collection in Mongo>
 
 @Schema()
 export class code {
   @Prop()
-  _id: string;
-  @Prop()
   Descripcion: string;
   @Prop()
-  Precio: string;
+  Precio: number;
   @Prop()
   Tipo: string;
   @Prop()
   hotel: string;
+  @Prop()
+  Clasificacion: string;
 }
 
 export const CodesSchema = SchemaFactory.createForClass(code);
+
+export class CreateCodeDto {
+  @IsString()
+  @IsNotEmpty()
+  Descripcion: string;
+
+  @IsNotEmpty()
+  Precio: number;
+
+  @IsString()
+  @IsNotEmpty()
+  Tipo: string;
+
+  @IsString()
+  @IsNotEmpty()
+  Clasificacion: string;
+}
 
 export type EstatusDocument = mongoose.HydratedDocument<estatus>;
 

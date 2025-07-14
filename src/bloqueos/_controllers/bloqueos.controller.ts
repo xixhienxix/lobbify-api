@@ -35,7 +35,6 @@ export class BloqueosController {
   @Put('/reportes/borrar-bloqueo/:id')
   @UseGuards(RolesUserGuard)
   async deleteBloqueo(@Param('id') bloqueoId: string): Promise<any> {
-    console.log('DELETEM BLOQUEOS');
     try {
       const result = await this._BloqueosService.deleteBloqueo(bloqueoId);
       if (result.deletedCount === 0) {

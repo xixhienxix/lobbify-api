@@ -33,7 +33,6 @@ export class RolesUserGuard implements CanActivate {
       req = host.getRequest();
     const authJwtToken = req.headers['authorization'];
     if (!authJwtToken) {
-      console.log('User Not Allowed by Guard');
       throw new UnauthorizedException();
     }
     try {

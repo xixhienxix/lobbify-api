@@ -139,8 +139,13 @@ export class GuestService {
   }
 
   async getDisponibilidad(hotel: string, params: any): Promise<any> {
+    const requestStart = Date.now();
+
     const busqueda = params.params;
     const sinDisponibilidad = [];
+    console.log(
+      `[${new Date().toISOString()}] [START] Service getDisponibilidad called`,
+    );
 
     const dispoquery = this.guestModel
       .find({
@@ -188,13 +193,14 @@ export class GuestService {
       .catch((err) => {
         return err;
       });
+    console.timeEnd('guestModel.find');
+    console.time('processGuestDocs');
 
     const normalizeDate = (date: Date) => {
       return new Date(date.getFullYear(), date.getMonth(), date.getDate());
     };
 
     const disponibilidad = await dispoquery.then((doc: any) => {
-      console.log('doc', doc);
       for (let i = 0; i < doc.length; i++) {
         const salidaDateNormalized = normalizeDate(
           new Date(doc[i]._doc.salida),
@@ -207,10 +213,6 @@ export class GuestService {
         const isSameDay =
           salidaDateNormalized.getTime() === initialDateNormalized.getTime();
 
-        console.log('isSameDay:', isSameDay);
-        console.log('salidaDateNormalized:', salidaDateNormalized);
-        console.log('initialDateNormalized:', initialDateNormalized);
-
         // If salida date is the same as busqueda.initialDate, skip adding to sinDisponibilidad
         if (!isSameDay) {
           sinDisponibilidad.push(doc[i]._doc.numeroCuarto);
@@ -218,7 +220,9 @@ export class GuestService {
       }
       return sinDisponibilidad;
     });
+    console.timeEnd('processGuestDocs');
 
+    console.time('bloqueosModel.find');
     const bloqueosQuery = this.bloqueosModel
       .find({
         hotel: 'Hotel Pokemon',
@@ -252,18 +256,25 @@ export class GuestService {
         ],
       })
       .exec();
+    console.timeEnd('bloqueosModel.find');
 
+    console.time('processBloqueosDocs');
     const bloqueosDocs = await bloqueosQuery;
     for (const doc2 of bloqueosDocs) {
       if (doc2.Cuarto && Array.isArray(doc2.Cuarto)) {
         sinDisponibilidad.push(...doc2.Cuarto);
       }
     }
+    console.timeEnd('processBloqueosDocs');
+
+    console.log(
+      `[${new Date().toISOString()}] [END] Service getDisponibilidad returning`,
+    );
+    console.log(`Total time taken: ${Date.now() - requestStart}ms`);
     return disponibilidad;
   }
 
   async postReservation(hotel: string, body: any): Promise<any> {
-    console.log('Reservacion antes de guardado: ,', body);
     const huespedArr = body.huespedInfo;
     const addedDocuments: any[] = [];
 
@@ -284,8 +295,6 @@ export class GuestService {
     const maxFolioNumber = Math.max(
       ...huespedArr.map((huesped) => parseInt(huesped.folio.substring(1), 10)),
     );
-
-    console.log('maxFolioNumber: ', maxFolioNumber);
 
     const filter = { hotel: hotel, Letra: letra };
 
@@ -311,8 +320,6 @@ export class GuestService {
     // Calculate the new folio number for the Foliador
     const newFolioNumber = maxFolioNumber + 1;
     const update = { Folio: `${newFolioNumber}` };
-    console.log('newFolioNumber: ', newFolioNumber);
-    console.log('update: ', update);
 
     // Update the Foliador in the database
     try {
@@ -337,9 +344,6 @@ export class GuestService {
   // Huesped
 
   async updateHuesped(hotel: string, body: any): Promise<huespeds[]> {
-    console.log('update Huesped', body);
-    console.log('update Huesped body.huesped.folio', body.huesped.folio);
-
     return this.guestModel
       .findOneAndUpdate(
         { folio: body.huesped.folio, hotel: hotel },
@@ -413,11 +417,9 @@ export class GuestService {
       )
       .then((data) => {
         if (!data) {
-          console.log(data);
           return;
         }
         if (data) {
-          console.log(data);
           return data;
         }
       })
@@ -464,7 +466,6 @@ export class GuestService {
   }
 
   async postDetails(hotel: string, body: any): Promise<HuespedDetails[]> {
-    console.log('body post huesped details', body);
     return this.huespedDetailsModel
       .findOneAndUpdate(
         {
@@ -503,11 +504,9 @@ export class GuestService {
       )
       .then((data) => {
         if (!data) {
-          console.log(data);
           return;
         }
         if (data) {
-          console.log(data);
           return data;
         }
       })
@@ -517,7 +516,6 @@ export class GuestService {
   }
 
   async updateEstatusHuesped(hotel: string, body: any): Promise<any> {
-    console.log('body----------------------->: ', body);
     let estatusActualizado = body.estatus;
     switch (body.estatus) {
       case '1':
@@ -546,11 +544,9 @@ export class GuestService {
           )
           .then((data) => {
             if (!data) {
-              console.log(data);
               return;
             }
             if (data) {
-              console.log(data);
               return data;
             }
           })
@@ -591,10 +587,8 @@ export class GuestService {
       )
       .then((data) => {
         if (data.modifiedCount > 0) {
-          console.log('Update successful:', data);
           return data;
         } else {
-          console.log('No document was updated:', data);
           return;
         }
       })

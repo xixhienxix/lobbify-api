@@ -32,13 +32,10 @@ export class BloqueosService {
       hotel: hotel,
     };
 
-    console.log('bloqueo Por añadir', bloqueoBase);
-
     // Use Promise.all to handle multiple room operations concurrently
     const results = await Promise.all(
       body.Cuarto.map(async (element: string) => {
         const cuartoArray = [element];
-        console.log('cuartoArray', cuartoArray);
 
         try {
           // Check for existing documents with identical properties
@@ -85,7 +82,6 @@ export class BloqueosService {
 
   async deleteBloqueo(bloqueoId: string): Promise<any> {
     try {
-      console.log('Borrando:', bloqueoId);
       const result = await this.bloqueosModel
         .updateOne(
           { _id: bloqueoId },

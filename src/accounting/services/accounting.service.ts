@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Edo_Cuenta } from '../models/accounting.model';
 import { huespeds } from 'src/guests/models/guest.model';
+import { DateTime } from 'luxon';
 @Injectable()
 export class AccountingService {
   constructor(
@@ -18,7 +19,6 @@ export class AccountingService {
         if (!data) {
           return;
         }
-        console.log(data);
         if (data) {
           return data;
         }
@@ -33,6 +33,10 @@ export class AccountingService {
     body: any,
   ): Promise<{ message: string; data: Edo_Cuenta }> {
     body.edoCuenta.hotel = hotel;
+
+    // const fechaInUserZone = DateTime.fromISO(body.Fecha, { zone: userTimeZone });
+    // Convert to UTC Date to store in DB if needed:
+    // const fechaUtcDate = fechaInUserZone.toUTC().toJSDate();
 
     try {
       const newEntry = await this.accountingModel.create(body.edoCuenta);
@@ -86,12 +90,10 @@ export class AccountingService {
       throw error; // Re-throw the error to the caller
     }
 
-    console.log('Final insertedDocumentArray:', insertedDocumentArray);
     return insertedDocumentArray;
   }
 
   async updatePaymentStatus(hotel: string, body: any): Promise<Edo_Cuenta[]> {
-    console.log('updatePaymentStatus: ', body);
     const _id = body._id;
 
     return this.accountingModel
@@ -119,13 +121,12 @@ export class AccountingService {
   }
 
   async updateHospedaje(hotel: string, body: any): Promise<Edo_Cuenta[]> {
-    console.log('updateHospedaje body: ', body);
 
     try {
       // Convert Fecha to Date if it's a string
       const updateData = {
         ...body.edoCuenta,
-        Fecha: new Date(body.edoCuenta.Fecha),
+        Fecha: body.edoCuenta.Fecha,
       };
 
       const updatedEdoCuenta = await this.accountingModel.findOneAndUpdate(
@@ -146,8 +147,6 @@ export class AccountingService {
         { new: true }, // This option returns the updated document
       );
 
-      console.log('Updated document:', updatedEdoCuenta);
-
       return updatedEdoCuenta ? [updatedEdoCuenta] : [];
     } catch (err) {
       console.error('Error updating the payment:', err);
@@ -156,8 +155,6 @@ export class AccountingService {
   }
 
   async getAllAccounts(hotel: string): Promise<Edo_Cuenta[]> {
-    console.log('HOTEL', { hotel });
-
     try {
       const data = await this.accountingModel.find({ hotel }).exec(); // Use exec() for a promise-based approach
       return data || []; // Return an empty array if no data is found
@@ -187,8 +184,6 @@ export class AccountingService {
   }
 
   async actualizaTotales(hotel: string, body: any): Promise<any> {
-    console.log('body:', body.folio);
-
     try {
       // Find data matching the folio and hotel
       const data = await this.accountingModel.find({

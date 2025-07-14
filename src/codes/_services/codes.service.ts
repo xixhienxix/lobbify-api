@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Adicional, Foliador, code, estatus } from '../_models/codes.model';
+import {
+  Adicional,
+  CreateCodeDto,
+  Foliador,
+  code,
+  estatus,
+} from '../_models/codes.model';
 
 @Injectable()
 export class CodesService {
@@ -74,5 +80,26 @@ export class CodesService {
       .catch((err) => {
         return err;
       });
+  }
+
+  async postNewCode(
+    codigo: CreateCodeDto,
+    hotel: string,
+  ): Promise<{ success: boolean; data?: code }> {
+    try {
+      const codigoConHotel = { ...codigo, hotel };
+
+      const createdCode = await this.codeModel.create(codigoConHotel);
+
+      return {
+        success: true,
+        data: createdCode,
+      };
+    } catch (error) {
+      console.error('Error inserting new code:', error);
+      return {
+        success: false,
+      };
+    }
   }
 }

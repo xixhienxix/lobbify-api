@@ -62,7 +62,6 @@ export class PromosService {
         intialDateFC: parseDate(body.data.intialDateFC),
         endDateFC: parseDate(body.data.endDateFC),
       };
-      console.log('data:', data);
 
       const createdData = await this.promosModel.create(data);
 
@@ -88,7 +87,6 @@ export class PromosService {
         _id: _id,
       })
       .then((data) => {
-        console.log(data);
         if (!data) {
           return;
         }
