@@ -139,6 +139,8 @@ export class GuestService {
   }
 
   async getDisponibilidad(hotel: string, params: any): Promise<any> {
+    console.log('hotel:', hotel);
+    console.log('params', params);
     const requestStart = Date.now();
 
     const busqueda = params.params;

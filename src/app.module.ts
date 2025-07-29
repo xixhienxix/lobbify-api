@@ -23,10 +23,12 @@ import { PromosModule } from './promos/promos.module';
 import { MailService } from './mail/mail.service';
 import { ConfigModule } from '@nestjs/config';
 import { MailController } from './mail/email.controller';
+import { PackagesModule } from './paquetes/paquetes.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     AuthModule,
+    PackagesModule,
     BloqueosModule,
     RoomsModule,
     CodesModule,

@@ -54,11 +54,14 @@ export class RoomsService {
     // Make sure to remove the _id from the update object before calling updateMany
     const { _id, ...update } = body.habitacion;
 
+    const isEdit = body.editar === true || body.editar === 'true';
+
+    console.log('body.editar: POST', body.editar);
     // Check if body.editar is true before proceeding with the update
-    if (body.editar === true) {
+    if (isEdit) {
       try {
         const result = await this.habModel.updateMany(filterEdit, update);
-
+        console.log('update table', result);
         // Check if any documents were modified
         if (result.modifiedCount === 0) {
           return {
@@ -75,6 +78,14 @@ export class RoomsService {
     } else {
       const response = [];
       const errors = [];
+
+      if (
+        !Array.isArray(body.habitacion.Numero) ||
+        body.habitacion.Numero.length < body.habitacion.Inventario
+      ) {
+        return { message: 'Invalid room numbers for the inventory size' };
+      }
+
       for (let i = 0; i < body.habitacion.Inventario; i++) {
         await this.habModel
           .create({
@@ -166,7 +177,6 @@ export class RoomsService {
       .updateMany(
         { Codigo: codigoCuarto, hotel: hotel },
         { $set: { URL: body.downloadURL } },
-        { upsert: true },
       )
       .then((data) => {
         if (!data) {

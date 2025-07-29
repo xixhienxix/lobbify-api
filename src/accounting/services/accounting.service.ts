@@ -121,7 +121,6 @@ export class AccountingService {
   }
 
   async updateHospedaje(hotel: string, body: any): Promise<Edo_Cuenta[]> {
-
     try {
       // Convert Fecha to Date if it's a string
       const updateData = {
