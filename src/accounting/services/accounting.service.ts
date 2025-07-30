@@ -34,14 +34,22 @@ export class AccountingService {
   ): Promise<{ message: string; data: Edo_Cuenta }> {
     body.edoCuenta.hotel = hotel;
 
-    // const fechaInUserZone = DateTime.fromISO(body.Fecha, { zone: userTimeZone });
-    // Convert to UTC Date to store in DB if needed:
-    // const fechaUtcDate = fechaInUserZone.toUTC().toJSDate();
-
     try {
+      // Create the main Edo_Cuenta entry
       const newEntry = await this.accountingModel.create(body.edoCuenta);
 
-      // Explicitly wrap the created object in a response structure
+      // If creation succeeds, update all related cuentas with same ID_Pago
+      if (body.edoCuenta.RelatedCuentas?.length > 0) {
+        await Promise.all(
+          body.edoCuenta.RelatedCuentas.map((rel: { _id: string }) =>
+            this.accountingModel.updateOne(
+              { _id: rel._id },
+              { $set: { ID_Pago: newEntry.ID_Pago } },
+            ),
+          ),
+        );
+      }
+
       return {
         message: 'Added',
         data: newEntry,
@@ -93,31 +101,57 @@ export class AccountingService {
     return insertedDocumentArray;
   }
 
-  async updatePaymentStatus(hotel: string, body: any): Promise<Edo_Cuenta[]> {
-    const _id = body._id;
+  async updatePaymentStatus(
+    hotel: string,
+    body: any,
+  ): Promise<Edo_Cuenta | null> {
+    const { _id, estatus, fechaCancelado, autorizo, edoCuenta } = body;
+    const { RelatedCuentas } = edoCuenta;
 
-    return this.accountingModel
-      .findByIdAndUpdate(
-        { _id, hotel: hotel },
+    try {
+      // 1. Actualizar documento principal
+      const updatedDoc = await this.accountingModel.findOneAndUpdate(
+        { _id, hotel },
         {
           $set: {
-            Estatus: body.estatus,
-            Fecha_Cancelado: body.fechaCancelado,
-            Autorizo: body.autorizo,
+            Estatus: estatus,
+            Fecha_Cancelado: fechaCancelado,
+            Autorizo: autorizo,
+            ID_Pago: '',
           },
         },
-      )
-      .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
-      })
-      .catch((err) => {
-        return err;
-      });
+        { new: true }, // retorna documento actualizado
+      );
+
+      if (!updatedDoc) {
+        console.log(`No se encontró documento con ID ${_id} en hotel ${hotel}`);
+        return null; // 🚫 no seguimos con RelatedCuentas
+      }
+
+      console.log('Documento principal actualizado:', updatedDoc);
+
+      // 2. Si principal OK y es Abono, limpiar RelatedCuentas
+      if (
+        edoCuenta?.Abono &&
+        edoCuenta.Abono !== 0 &&
+        Array.isArray(RelatedCuentas)
+      ) {
+        await Promise.all(
+          RelatedCuentas.map((c: any) =>
+            this.accountingModel.updateOne(
+              { _id: c._id },
+              { $set: { ID_Pago: '' } },
+            ),
+          ),
+        );
+        console.log('RelatedCuentas actualizadas');
+      }
+
+      return updatedDoc;
+    } catch (err) {
+      console.error('Error al actualizar pago:', err);
+      throw err;
+    }
   }
 
   async updateHospedaje(hotel: string, body: any): Promise<Edo_Cuenta[]> {

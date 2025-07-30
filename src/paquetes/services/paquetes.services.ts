@@ -11,14 +11,10 @@ export class PaquetesServices {
   ) {}
 
   async getAllPackages(hotel: string): Promise<Paquetes[]> {
-    console.log('[getAllPackages] hotel parameter:', hotel);
-
     try {
       const result = await this.paquetesModel.find({ hotel }).exec();
-      console.log('[getAllPackages] Query result:', result);
       return result;
     } catch (error) {
-      console.error('[getAllPackages] Query error:', error);
       throw error;
     }
   }

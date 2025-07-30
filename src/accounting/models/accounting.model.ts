@@ -33,6 +33,12 @@ export class Edo_Cuenta {
   hotel: string;
   @Prop()
   Cajero: string;
+  @Prop()
+  Pagado: boolean;
+  @Prop()
+  ID_Pago: string;
+  @Prop({ type: [Object] })
+  RelatedCuentas: Edo_Cuenta[];
 }
 
 export const EdoCuentaSchema = SchemaFactory.createForClass(Edo_Cuenta);
