@@ -531,9 +531,10 @@ export class GuestService {
         break;
       case '4':
         estatusActualizado = 'Check-Out';
+
         return this.guestModel
           .updateOne(
-            { folio: body.folio },
+            { folio: body.huesped.folio },
             {
               $set: {
                 estatus: estatusActualizado,
