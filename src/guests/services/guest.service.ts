@@ -140,44 +140,66 @@ export class GuestService {
 
   async getDisponibilidad(hotel: string, params: any): Promise<any> {
     console.log('hotel:', hotel);
-    console.log('params', params);
-    const requestStart = Date.now();
+    console.log('params:', params);
 
+    const t0 = Date.now();
     const busqueda = params.params;
-    const sinDisponibilidad = [];
-    console.log(
-      `[${new Date().toISOString()}] [START] Service getDisponibilidad called`,
+
+    // --- Marcas de tiempo crudas y normalizadas
+    const initial = new Date(busqueda.initialDate);
+    const end = new Date(busqueda.endDate);
+    const normalizeDate = (d: Date) =>
+      new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const initialDayStart = normalizeDate(initial);
+    const initialDayEnd = new Date(
+      initialDayStart.getTime() + 24 * 60 * 60 * 1000,
     );
+
+    console.log(
+      '[BOUNDARIES]',
+      '\n initial (raw):',
+      initial.toString(),
+      '\n initial ISO :',
+      initial.toISOString(),
+      ' | epoch:',
+      initial.getTime(),
+      '\n end (raw)    :',
+      end.toString(),
+      '\n end ISO      :',
+      end.toISOString(),
+      ' | epoch:',
+      end.getTime(),
+      '\n initialDayStart:',
+      initialDayStart.toString(),
+      'ISO:',
+      initialDayStart.toISOString(),
+      '\n initialDayEnd  :',
+      initialDayEnd.toString(),
+      'ISO:',
+      initialDayEnd.toISOString(),
+    );
+
+    const sinDisponibilidad: string[] = [];
+    console.log(`[${new Date().toISOString()}] [START] getDisponibilidad`);
+
+    // --- (opcional) loguea cómo están tus estatus permitidos/excluidos
+    // console.log('reservationStatusMap[1]=', reservationStatusMap[1]);
+    // console.log('reservationStatusMap[2]=', reservationStatusMap[2]);
+    // console.log('reservationStatusMap[5]=', reservationStatusMap[5]);
+    // console.log('reservationStatusMap[6]=', reservationStatusMap[6]);
+    // console.log('reservationStatusMap[4]=', reservationStatusMap[4], ' [8]=', reservationStatusMap[8], ' [7]=', reservationStatusMap[7]);
 
     const dispoquery = this.guestModel
       .find({
-        hotel: hotel,
+        hotel,
         $or: [
+          { llegada: { $gte: busqueda.initialDate, $lt: busqueda.endDate } }, // C1
+          { salida: { $gt: busqueda.initialDate, $lte: busqueda.endDate } }, // C2
           {
-            // Case 1: The arrival date of the reservation is within the provided range
-            llegada: {
-              $gte: busqueda.initialDate,
-              $lt: busqueda.endDate,
-            },
-          },
-          {
-            // Case 2: The departure date of the reservation is within the provided range
-            salida: {
-              $gt: busqueda.initialDate,
-              $lte: busqueda.endDate,
-            },
-          },
-          {
-            // Case 3: The reservation completely encompasses the provided range
-            llegada: {
-              $lt: busqueda.initialDate,
-            },
-            salida: {
-              $gt: busqueda.endDate,
-            },
-          },
+            llegada: { $lt: busqueda.initialDate },
+            salida: { $gt: busqueda.endDate },
+          }, // C3
         ],
-        // Include only the relevant reservation statuses
         estatus: {
           $in: [
             ...reservationStatusMap[1],
@@ -192,63 +214,88 @@ export class GuestService {
           ],
         },
       })
-      .catch((err) => {
-        return err;
-      });
-    console.timeEnd('guestModel.find');
-    console.time('processGuestDocs');
+      .catch((err) => err);
 
-    const normalizeDate = (date: Date) => {
-      return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    };
+    const docs = await dispoquery;
+    if (!Array.isArray(docs)) {
+      console.error(
+        '[ERROR] dispoquery devolvió algo que NO es un array:',
+        docs,
+      );
+      return [];
+    }
 
-    const disponibilidad = await dispoquery.then((doc: any) => {
-      for (let i = 0; i < doc.length; i++) {
-        const salidaDateNormalized = normalizeDate(
-          new Date(doc[i]._doc.salida),
-        );
-        const initialDateNormalized = normalizeDate(
-          new Date(busqueda.initialDate),
-        );
+    console.log(`[QUERY] docs encontrados: ${docs.length}`);
+    // Revisa rápido si hay docs del cuarto sospechoso
+    const sospechosos = docs.filter(
+      (d: any) => (d._doc?.numeroCuarto || d.numeroCuarto) === 'Sencilla Two',
+    );
+    if (sospechosos.length) {
+      console.warn(
+        `[QUERY] Coincidencias para "Sencilla Two": ${sospechosos.length}`,
+      );
+    }
 
-        // Compare normalized dates
-        const isSameDay =
-          salidaDateNormalized.getTime() === initialDateNormalized.getTime();
+    // --- Itera y explica por qué cada doc entra / si lo agregas o no
+    for (let i = 0; i < docs.length; i++) {
+      const d = docs[i]._doc ?? docs[i];
+      const llegada = new Date(d.llegada);
+      const salida = new Date(d.salida);
 
-        // If salida date is the same as busqueda.initialDate, skip adding to sinDisponibilidad
-        if (!isSameDay) {
-          sinDisponibilidad.push(doc[i]._doc.numeroCuarto);
-        }
+      const c1 =
+        llegada.getTime() >= initial.getTime() &&
+        llegada.getTime() < end.getTime();
+      const c2 =
+        salida.getTime() > initial.getTime() &&
+        salida.getTime() <= end.getTime();
+      const c3 =
+        llegada.getTime() < initial.getTime() &&
+        salida.getTime() > end.getTime();
+
+      const salidaNorm = normalizeDate(salida);
+      const initialNorm = initialDayStart;
+      const isSameDay = salidaNorm.getTime() === initialNorm.getTime();
+
+      // decisión de push (tu lógica actual)
+      const shouldPush = !isSameDay;
+
+      console.log(
+        `[DOC ${i}] #${d.numeroCuarto} | estatus=${d.estatus}`,
+        `\n  llegada: ${llegada.toString()} | ISO: ${llegada.toISOString()} | epoch: ${llegada.getTime()}`,
+        `\n  salida : ${salida.toString()}  | ISO: ${salida.toISOString()}  | epoch: ${salida.getTime()}`,
+        `\n  C1=${c1} C2=${c2} C3=${c3}  (por esto el query lo trajo)`,
+        `\n  same-day? (salida vs initial) -> ${isSameDay} (salidaNorm=${salidaNorm.toISOString()} vs initialNorm=${initialNorm.toISOString()})`,
+        `\n  *** agregar a sinDisponibilidad? ${shouldPush} ***`,
+      );
+
+      if (shouldPush) {
+        sinDisponibilidad.push(d.numeroCuarto);
       }
-      return sinDisponibilidad;
-    });
-    console.timeEnd('processGuestDocs');
+    }
 
-    console.time('bloqueosModel.find');
+    // --- Resumen por cuarto (duplicados etc.)
+    const freq: Record<string, number> = {};
+    for (const q of sinDisponibilidad) freq[q] = (freq[q] || 0) + 1;
+    console.log(
+      '[RESUMEN] Cuartos marcados sin disponibilidad (frecuencia):',
+      freq,
+    );
+
+    // --- Bloqueos
     const bloqueosQuery = this.bloqueosModel
       .find({
-        hotel: 'Hotel Pokemon',
+        hotel: 'Hotel Pokemon', // ojo: literal distinto de "hotel" param
         $and: [
           {
             $or: [
               {
-                Desde: {
-                  $lte: new Date(busqueda.endDate),
-                },
-                Hasta: {
-                  $gte: new Date(busqueda.initialDate),
-                },
+                Desde: { $lte: new Date(busqueda.endDate) },
+                Hasta: { $gte: new Date(busqueda.initialDate) },
               },
-              {
-                Hasta: {
-                  $eq: new Date(busqueda.endDate),
-                },
-              },
+              { Hasta: { $eq: new Date(busqueda.endDate) } },
             ],
           },
-          {
-            Completed: false,
-          },
+          { Completed: false },
           {
             $or: [
               { 'Estatus.sinLlegadas': true },
@@ -258,22 +305,32 @@ export class GuestService {
         ],
       })
       .exec();
-    console.timeEnd('bloqueosModel.find');
 
-    console.time('processBloqueosDocs');
     const bloqueosDocs = await bloqueosQuery;
-    for (const doc2 of bloqueosDocs) {
-      if (doc2.Cuarto && Array.isArray(doc2.Cuarto)) {
-        sinDisponibilidad.push(...doc2.Cuarto);
+    console.log(`[BLOQUEOS] docs encontrados: ${bloqueosDocs.length}`);
+    for (let j = 0; j < bloqueosDocs.length; j++) {
+      const b = bloqueosDocs[j];
+      const desde = new Date(b.Desde);
+      const hasta = new Date(b.Hasta);
+      const toca = !(hasta < initial || desde > end);
+      console.log(
+        `[BLOQ ${j}] Cuartos=${JSON.stringify(b.Cuarto)} | sinLlegadas=${
+          b?.Estatus?.sinLlegadas
+        } | fueraDeServicio=${b?.Estatus?.fueraDeServicio}`,
+        `\n  Desde: ${desde.toString()} (${desde.toISOString()})  Hasta: ${hasta.toString()} (${hasta.toISOString()})`,
+        `\n  ¿toca ventana? ${toca}`,
+      );
+      if (b.Cuarto && Array.isArray(b.Cuarto)) {
+        sinDisponibilidad.push(...b.Cuarto);
       }
     }
-    console.timeEnd('processBloqueosDocs');
 
     console.log(
-      `[${new Date().toISOString()}] [END] Service getDisponibilidad returning`,
+      `[END] Total marcados sin disponibilidad: ${
+        sinDisponibilidad.length
+      } | tiempo: ${Date.now() - t0}ms`,
     );
-    console.log(`Total time taken: ${Date.now() - requestStart}ms`);
-    return disponibilidad;
+    return sinDisponibilidad;
   }
 
   async postReservation(hotel: string, body: any): Promise<any> {
