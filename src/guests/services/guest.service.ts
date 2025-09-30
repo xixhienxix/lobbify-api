@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { HuespedDetails, Promesas, huespeds } from '../models/guest.model';
 import { estatus, Foliador } from 'src/codes/_models/codes.model';
 import { Bloqueos } from 'src/bloqueos/_models/bloqueos.model';
+import { DateTime } from 'luxon';
 
 const reservationStatusMap: { [key: number]: string[] } = {
   1: ['Huesped en Casa', 'Walk-In', 'Reserva en Casa'],
@@ -145,59 +146,61 @@ export class GuestService {
     const t0 = Date.now();
     const busqueda = params.params;
 
-    // --- Marcas de tiempo crudas y normalizadas
-    const initial = new Date(busqueda.initialDate);
-    const end = new Date(busqueda.endDate);
-    const normalizeDate = (d: Date) =>
-      new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const initialDayStart = normalizeDate(initial);
-    const initialDayEnd = new Date(
-      initialDayStart.getTime() + 24 * 60 * 60 * 1000,
-    );
+    // --- Marcas de tiempo usando Luxon con zona 'America/Mexico_City'
+    const initial = DateTime.fromISO(busqueda.initialDate, {
+      zone: 'America/Mexico_City',
+    });
+    const end = DateTime.fromISO(busqueda.endDate, {
+      zone: 'America/Mexico_City',
+    });
+
+    const initialDayStart = initial.startOf('day');
+    const initialDayEnd = initialDayStart.plus({ days: 1 });
 
     console.log(
       '[BOUNDARIES]',
       '\n initial (raw):',
       initial.toString(),
       '\n initial ISO :',
-      initial.toISOString(),
+      initial.toISO(),
       ' | epoch:',
-      initial.getTime(),
+      initial.toMillis(),
       '\n end (raw)    :',
       end.toString(),
       '\n end ISO      :',
-      end.toISOString(),
+      end.toISO(),
       ' | epoch:',
-      end.getTime(),
+      end.toMillis(),
       '\n initialDayStart:',
       initialDayStart.toString(),
       'ISO:',
-      initialDayStart.toISOString(),
+      initialDayStart.toISO(),
       '\n initialDayEnd  :',
       initialDayEnd.toString(),
       'ISO:',
-      initialDayEnd.toISOString(),
+      initialDayEnd.toISO(),
     );
 
     const sinDisponibilidad: string[] = [];
-    console.log(`[${new Date().toISOString()}] [START] getDisponibilidad`);
+    console.log(`[${DateTime.now().toISO()}] [START] getDisponibilidad`);
 
-    // --- (opcional) loguea cómo están tus estatus permitidos/excluidos
-    // console.log('reservationStatusMap[1]=', reservationStatusMap[1]);
-    // console.log('reservationStatusMap[2]=', reservationStatusMap[2]);
-    // console.log('reservationStatusMap[5]=', reservationStatusMap[5]);
-    // console.log('reservationStatusMap[6]=', reservationStatusMap[6]);
-    // console.log('reservationStatusMap[4]=', reservationStatusMap[4], ' [8]=', reservationStatusMap[8], ' [7]=', reservationStatusMap[7]);
-
+    // --- Query de disponibilidad usando fechas en UTC
     const dispoquery = this.guestModel
       .find({
         hotel,
         $or: [
-          { llegada: { $gte: busqueda.initialDate, $lt: busqueda.endDate } }, // C1
-          { salida: { $gt: busqueda.initialDate, $lte: busqueda.endDate } }, // C2
           {
-            llegada: { $lt: busqueda.initialDate },
-            salida: { $gt: busqueda.endDate },
+            llegada: {
+              $gte: initial.toUTC().toISO(),
+              $lt: end.toUTC().toISO(),
+            },
+          }, // C1
+          {
+            salida: { $gt: initial.toUTC().toISO(), $lte: end.toUTC().toISO() },
+          }, // C2
+          {
+            llegada: { $lt: initial.toUTC().toISO() },
+            salida: { $gt: end.toUTC().toISO() },
           }, // C3
         ],
         estatus: {
@@ -226,45 +229,39 @@ export class GuestService {
     }
 
     console.log(`[QUERY] docs encontrados: ${docs.length}`);
-    // Revisa rápido si hay docs del cuarto sospechoso
-    const sospechosos = docs.filter(
-      (d: any) => (d._doc?.numeroCuarto || d.numeroCuarto) === 'Sencilla Two',
-    );
-    if (sospechosos.length) {
-      console.warn(
-        `[QUERY] Coincidencias para "Sencilla Two": ${sospechosos.length}`,
-      );
-    }
 
     // --- Itera y explica por qué cada doc entra / si lo agregas o no
     for (let i = 0; i < docs.length; i++) {
       const d = docs[i]._doc ?? docs[i];
-      const llegada = new Date(d.llegada);
-      const salida = new Date(d.salida);
+      const llegada = DateTime.fromISO(d.llegada, {
+        zone: 'America/Mexico_City',
+      });
+      const salida = DateTime.fromISO(d.salida, {
+        zone: 'America/Mexico_City',
+      });
 
       const c1 =
-        llegada.getTime() >= initial.getTime() &&
-        llegada.getTime() < end.getTime();
+        llegada.toMillis() >= initial.toMillis() &&
+        llegada.toMillis() < end.toMillis();
       const c2 =
-        salida.getTime() > initial.getTime() &&
-        salida.getTime() <= end.getTime();
+        salida.toMillis() > initial.toMillis() &&
+        salida.toMillis() <= end.toMillis();
       const c3 =
-        llegada.getTime() < initial.getTime() &&
-        salida.getTime() > end.getTime();
+        llegada.toMillis() < initial.toMillis() &&
+        salida.toMillis() > end.toMillis();
 
-      const salidaNorm = normalizeDate(salida);
+      const salidaNorm = salida.startOf('day');
       const initialNorm = initialDayStart;
-      const isSameDay = salidaNorm.getTime() === initialNorm.getTime();
+      const isSameDay = salidaNorm.toMillis() === initialNorm.toMillis();
 
-      // decisión de push (tu lógica actual)
       const shouldPush = !isSameDay;
 
       console.log(
         `[DOC ${i}] #${d.numeroCuarto} | estatus=${d.estatus}`,
-        `\n  llegada: ${llegada.toString()} | ISO: ${llegada.toISOString()} | epoch: ${llegada.getTime()}`,
-        `\n  salida : ${salida.toString()}  | ISO: ${salida.toISOString()}  | epoch: ${salida.getTime()}`,
+        `\n  llegada: ${llegada.toString()} | ISO: ${llegada.toISO()} | epoch: ${llegada.toMillis()}`,
+        `\n  salida : ${salida.toString()}  | ISO: ${salida.toISO()} | epoch: ${salida.toMillis()}`,
         `\n  C1=${c1} C2=${c2} C3=${c3}  (por esto el query lo trajo)`,
-        `\n  same-day? (salida vs initial) -> ${isSameDay} (salidaNorm=${salidaNorm.toISOString()} vs initialNorm=${initialNorm.toISOString()})`,
+        `\n  same-day? (salida vs initial) -> ${isSameDay} (salidaNorm=${salidaNorm.toISO()} vs initialNorm=${initialNorm.toISO()})`,
         `\n  *** agregar a sinDisponibilidad? ${shouldPush} ***`,
       );
 
@@ -284,15 +281,15 @@ export class GuestService {
     // --- Bloqueos
     const bloqueosQuery = this.bloqueosModel
       .find({
-        hotel: 'Hotel Pokemon', // ojo: literal distinto de "hotel" param
+        hotel: 'Hotel Pokemon',
         $and: [
           {
             $or: [
               {
-                Desde: { $lte: new Date(busqueda.endDate) },
-                Hasta: { $gte: new Date(busqueda.initialDate) },
+                Desde: { $lte: end.toUTC().toISO() },
+                Hasta: { $gte: initial.toUTC().toISO() },
               },
-              { Hasta: { $eq: new Date(busqueda.endDate) } },
+              { Hasta: { $eq: end.toUTC().toISO() } },
             ],
           },
           { Completed: false },
@@ -310,16 +307,21 @@ export class GuestService {
     console.log(`[BLOQUEOS] docs encontrados: ${bloqueosDocs.length}`);
     for (let j = 0; j < bloqueosDocs.length; j++) {
       const b = bloqueosDocs[j];
-      const desde = new Date(b.Desde);
-      const hasta = new Date(b.Hasta);
-      const toca = !(hasta < initial || desde > end);
+      const desde = DateTime.fromISO(b.Desde, { zone: 'America/Mexico_City' });
+      const hasta = DateTime.fromISO(b.Hasta, { zone: 'America/Mexico_City' });
+      const toca = !(
+        hasta.toMillis() < initial.toMillis() ||
+        desde.toMillis() > end.toMillis()
+      );
+
       console.log(
         `[BLOQ ${j}] Cuartos=${JSON.stringify(b.Cuarto)} | sinLlegadas=${
           b?.Estatus?.sinLlegadas
         } | fueraDeServicio=${b?.Estatus?.fueraDeServicio}`,
-        `\n  Desde: ${desde.toString()} (${desde.toISOString()})  Hasta: ${hasta.toString()} (${hasta.toISOString()})`,
+        `\n  Desde: ${desde.toString()} (${desde.toISO()})  Hasta: ${hasta.toString()} (${hasta.toISO()})`,
         `\n  ¿toca ventana? ${toca}`,
       );
+
       if (b.Cuarto && Array.isArray(b.Cuarto)) {
         sinDisponibilidad.push(...b.Cuarto);
       }
@@ -330,6 +332,7 @@ export class GuestService {
         sinDisponibilidad.length
       } | tiempo: ${Date.now() - t0}ms`,
     );
+
     return sinDisponibilidad;
   }
 
