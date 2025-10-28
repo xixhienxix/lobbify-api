@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { HuespedDetails, Promesas, huespeds } from '../models/guest.model';
+import {
+  FilterReservationsDto,
+  HuespedDetails,
+  Promesas,
+  huespeds,
+} from '../models/guest.model';
 import { estatus, Foliador } from 'src/codes/_models/codes.model';
 import { Bloqueos } from 'src/bloqueos/_models/bloqueos.model';
 import { DateTime } from 'luxon';
@@ -466,6 +471,7 @@ export class GuestService {
         { folio: body.huesped.folio, hotel: hotel },
         {
           $set: {
+            estatus_Ama_De_Llaves: body.huesped.estatus_Ama_De_Llaves,
             llegada: body.huesped.llegada,
             salida: body.huesped.salida,
             tarifa: body.huesped.tarifa,
@@ -659,5 +665,50 @@ export class GuestService {
         console.error('Update failed:', err);
         throw err; // Re-throw the error to handle it further up the chain if needed
       });
+  }
+
+  // reservation.service.ts
+  async searchByFilter(hotel: string, filters: any) {
+    const { llegada, salida, numeroCuarto, habitacion, estatus, amaDesc } =
+      filters;
+
+    const matchStage: any = {
+      hotel,
+    };
+
+    // ✅ Dynamically build the $match filter only with defined params
+    if (estatus) matchStage.estatus = estatus;
+    if (habitacion) matchStage.tipoHab = habitacion;
+    if (amaDesc) matchStage['housekeeping.Descripcion'] = amaDesc;
+    if (numeroCuarto) matchStage.numeroCuarto = numeroCuarto;
+    if (llegada && salida) {
+      matchStage.llegada = { $gte: new Date(llegada) };
+      matchStage.salida = { $lte: new Date(salida) };
+    }
+
+    console.log('matchStage:', matchStage);
+
+    // 🧩 Build the pipeline dynamically
+    const pipeline: any[] = [
+      {
+        $lookup: {
+          from: 'Ama_De_Llaves',
+          localField: 'roomStatus',
+          foreignField: 'Descripcion',
+          as: 'housekeeping',
+        },
+      },
+      { $unwind: { path: '$housekeeping', preserveNullAndEmptyArrays: true } },
+    ];
+
+    // ✅ Only push $match if there are filters to apply
+    if (Object.keys(matchStage).length > 0) {
+      pipeline.unshift({ $match: matchStage });
+    }
+
+    pipeline.push({ $sort: { checkin: 1 } }); // optional sort
+
+    const results = await this.guestModel.aggregate(pipeline);
+    return results;
   }
 }

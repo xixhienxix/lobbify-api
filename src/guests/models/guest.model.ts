@@ -1,4 +1,5 @@
 import { SchemaFactory, Schema, Prop } from '@nestjs/mongoose';
+import { IsOptional, IsString } from 'class-validator';
 import * as mongoose from 'mongoose';
 
 export type GuestDocument = mongoose.HydratedDocument<huespeds>; //<name of collection in Mongo>
@@ -147,3 +148,16 @@ export class HuespedDetails {
 
 export const HuespedDetailsSchema =
   SchemaFactory.createForClass(HuespedDetails);
+
+export class FilterReservationsDto {
+  @IsOptional() @IsString() initialDate?: string;
+  @IsOptional() @IsString() endDate?: string;
+  @IsOptional() @IsString() cuarto?: string;
+  @IsOptional() @IsString() tipoHab?: string;
+  @IsOptional() @IsString() roomStatus?: string;
+  @IsOptional() @IsString() guestStatus?: string;
+  @IsOptional() @IsString() limit?: string;
+  @IsOptional() @IsString() skip?: string;
+  @IsOptional() @IsString() sortBy?: string;
+  @IsOptional() @IsString() sortOrder?: string;
+}

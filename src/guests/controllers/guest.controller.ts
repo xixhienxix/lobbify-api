@@ -4,11 +4,13 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { RolesUserGuard } from 'src/guards/roles.user.guard';
 import { GuestService } from '../services/guest.service';
+import { FilterReservationsDto } from '../models/guest.model';
 
 @Controller()
 export class GuestsController {
@@ -20,6 +22,17 @@ export class GuestsController {
     const hotel = request.headers['hotel'];
 
     return this._GuestService.findAll(hotel);
+  }
+
+  @Get('/huesped/filteredRsv')
+  @UseGuards(RolesUserGuard)
+  async searchRsv(
+    @Req() request: Request,
+    @Query() filters: FilterReservationsDto,
+  ): Promise<any> {
+    const hotel = request.headers['hotel'];
+
+    return this._GuestService.searchByFilter(hotel, filters);
   }
 
   @Post('/huesped/save')
