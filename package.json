@@ -28,6 +28,8 @@
     "@nestjs/core": "^8.4.7",
     "@nestjs/mongoose": "^10.0.2",
     "@nestjs/platform-express": "^8.4.7",
+    "@nestjs/platform-socket.io": "^8.4.7",
+    "@nestjs/websockets": "^8.4.7",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "dotnet": "^1.1.4",
@@ -42,7 +44,8 @@
     "password-hash-and-salt": "^0.1.4",
     "reflect-metadata": "^0.1.13",
     "rimraf": "^3.0.2",
-    "rxjs": "^7.2.0"
+    "rxjs": "^7.2.0",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^8.0.0",

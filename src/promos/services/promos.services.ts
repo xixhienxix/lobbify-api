@@ -3,9 +3,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Promos } from '../models/promos.model';
 import { Model } from 'mongoose';
 import { DateTime } from 'luxon';
+import { PromosGateway } from '../gateway/promos.gateway';
 @Injectable()
 export class PromosService {
   constructor(
+    private readonly promosGateway: PromosGateway,
     @InjectModel('Promos') private readonly promosModel: Model<Promos>,
   ) {}
 
@@ -64,6 +66,9 @@ export class PromosService {
       };
 
       const createdData = await this.promosModel.create(data);
+
+      // Emitimos el evento para notificar a los clientes conectados
+      this.promosGateway.broadcastPromosUpdate();
 
       return {
         success: true,
