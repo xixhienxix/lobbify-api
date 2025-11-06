@@ -10,7 +10,7 @@ async function bootstrap() {
 
   // Enable CORS with custom headers
   app.enableCors({
-    origin: '*', // Allow requests from any origin
+    origin: 'https://lobify-front.web.app', // Allow requests from any origin
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Authorization, hotel, x-internal-access', // Include the 'hotel' header
     credentials: true, // Set this to true if you are using cookies or auth headers
