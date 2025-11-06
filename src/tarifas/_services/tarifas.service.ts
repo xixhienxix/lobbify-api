@@ -2,10 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { tarifas } from '../_models/tarifas.model';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
-
+import { DateTime } from 'luxon';
+import { RatesGateway } from '../_gateway/rates.gateway';
 @Injectable()
 export class TarifasService {
   constructor(
+    private ratesGateway: RatesGateway,
     @InjectModel(tarifas.name) private tarifasModel: Model<tarifas>,
   ) {}
 
@@ -25,6 +27,46 @@ export class TarifasService {
       });
   }
 
+  async findActiveRates(hotel: string): Promise<tarifas[]> {
+    const tz = 'America/Mexico_City';
+
+    const today = DateTime.now().setZone(tz).startOf('day').toJSDate();
+
+    const result = await this.tarifasModel
+      .find({
+        hotel,
+        Estado: true,
+        Llegada: { $lte: today },
+        Salida: { $gte: today },
+      })
+      .exec();
+
+    console.log(
+      'Filtering Rates:',
+      result.map((r) => r.Tarifa),
+    ); // Cleaner log
+
+    return result;
+  }
+
+  async findActiveRatesByDate(hotel: string, date: string): Promise<tarifas[]> {
+    const tz = 'America/Mexico_City';
+
+    // Convertimos la fecha recibida y la normalizamos a 00:00 hora local
+    const targetDate = DateTime.fromISO(date, { zone: tz })
+      .startOf('day')
+      .toJSDate();
+
+    return this.tarifasModel
+      .find({
+        hotel,
+        Estado: true,
+        Llegada: { $lte: targetDate },
+        Salida: { $gte: targetDate },
+      })
+      .exec();
+  }
+
   async findAllRackRates(hotel: string): Promise<tarifas[]> {
     return this.tarifasModel
       .find({ Tarifa: 'Tarifa Estandar', hotel: hotel })
@@ -41,7 +83,7 @@ export class TarifasService {
       });
   }
 
-  async postTarifa(hotel, body): Promise<tarifas[]> {
+  async postTarifa(hotel, body): Promise<any> {
     const id = new mongoose.Types.ObjectId();
 
     const newRate = new this.tarifasModel({
@@ -66,22 +108,23 @@ export class TarifasService {
       hotel: hotel,
     });
 
-    return await newRate
-      .save()
-      .then((data) => {
-        if (!data) {
-          return {
-            message: 'No se pudo Guardar la Tarifa Intente de nuevo mas tarde',
-          };
-        }
-        if (data) {
-          return { message: 'Tarifa generada con exito' };
-        }
-      })
-      .catch((err) => {
-        console.log(err);
-        return err;
-      });
+    try {
+      const data = await newRate.save();
+
+      if (data) {
+        // ✅ Broadcast websocket event
+        this.ratesGateway.broadcastRatesUpdate();
+
+        return { message: 'Tarifa generada con exito' };
+      } else {
+        return {
+          message: 'No se pudo Guardar la Tarifa Intente de nuevo mas tarde',
+        };
+      }
+    } catch (err) {
+      console.log(err);
+      return err;
+    }
   }
 
   async updateTarifaBase(body): Promise<tarifas> {

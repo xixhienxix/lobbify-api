@@ -122,17 +122,10 @@ export class GuestsController {
     return this._GuestService.updateEstatusHuesped(hotel, body);
   }
 
-  // @Post('actualiza')
-  // async actualizaHuespedModifica(
-  //   @Req() request: Request,
-  //   @Body('llegada') llegada: string,
-  //   @Body('salida') salida: string,
-  //   @Body('numeroCuarto') numeroCuarto: string,
-  //   @Body('habitacion') habitacion: string,
-  // ) {
-  //   const hotel = request.headers['hotel'];
-
-  //   const nombreHotel = hotel.replace(/\s/g, '_');
-  //   return this.huespedService.actualizaHuespedModifica(llegada, salida, numeroCuarto, habitacion, nombreHotel);
-  // }
+  @Get('reservations/resumen-reservaciones')
+  @UseGuards(RolesUserGuard)
+  async getReservationSummary(@Req() request: Request) {
+    const hotel = request.headers['hotel'];
+    return this._GuestService.getReservationSummary(hotel);
+  }
 }

@@ -7,9 +7,11 @@ import {
   UseGuards,
   Delete,
   Param,
+  Query,
 } from '@nestjs/common';
 import { RolesUserGuard } from 'src/guards/roles.user.guard';
 import { TarifasService } from '../_services/tarifas.service';
+import { request } from 'http';
 
 @Controller()
 export class TarifasController {
@@ -27,9 +29,30 @@ export class TarifasController {
   @UseGuards(RolesUserGuard)
   async findRackRates(@Req() request: Request): Promise<any> {
     const hotel = request.headers['hotel'];
-
     return this._tarifasService.findAllRackRates(hotel);
   }
+
+  @Get('/tarifas/activas')
+  @UseGuards(RolesUserGuard)
+  async activeRates(
+    @Req() request: Request,
+    @Query('date') date?: string, // fecha opcional
+  ): Promise<any> {
+    const hotel = request.headers['hotel'] as string;
+
+    if (!hotel) {
+      return { error: 'Missing hotel header' };
+    }
+
+    // Si viene fecha -> usar método con fecha
+    if (date) {
+      return this._tarifasService.findActiveRatesByDate(hotel, date);
+    }
+
+    // Si no viene fecha -> usar hoy
+    return this._tarifasService.findActiveRates(hotel);
+  }
+
   @Post('/tarifas/agregar')
   @UseGuards(RolesUserGuard)
   postTarifa(@Body() body, @Req() request: Request) {

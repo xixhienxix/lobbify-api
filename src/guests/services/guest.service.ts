@@ -10,6 +10,7 @@ import {
 import { estatus, Foliador } from 'src/codes/_models/codes.model';
 import { Bloqueos } from 'src/bloqueos/_models/bloqueos.model';
 import { DateTime } from 'luxon';
+import { GuestGateway } from '../gateway/guest.gateway';
 
 const reservationStatusMap: { [key: number]: string[] } = {
   1: ['Huesped en Casa', 'Walk-In', 'Reserva en Casa'],
@@ -29,6 +30,7 @@ const reservationStatusMap: { [key: number]: string[] } = {
 @Injectable()
 export class GuestService {
   constructor(
+    private guestsGateway: GuestGateway,
     @InjectModel(huespeds.name) private guestModel: Model<huespeds>,
     @InjectModel('Foliador') private readonly foliadorModel: Model<Foliador>,
     @InjectModel('Promesas') private readonly promesasModel: Model<Promesas>,
@@ -401,6 +403,8 @@ export class GuestService {
           addedDocuments,
         };
       }
+      // ✅ WEBSOCKET BROADCAST HERE (SUCCESS)
+      this.guestsGateway.broadcastGuestsUpdate();
       return { message: 'Folio actualizado con éxito', addedDocuments };
     } catch (err) {
       console.log('Error updating foliador:', err);
@@ -710,5 +714,49 @@ export class GuestService {
 
     const results = await this.guestModel.aggregate(pipeline);
     return results;
+  }
+
+  async getReservationSummary(hotel: string) {
+    const reservations = await this.guestModel.find({ hotel }).lean();
+
+    const currentDate = DateTime.local().setZone('America/Mexico_City');
+    const todayDateString = currentDate.toISODate();
+
+    const isToday = (date: string) =>
+      DateTime.fromISO(date).hasSame(currentDate, 'day');
+
+    const resumen = {
+      llegadas: [],
+      salidas: [],
+      colgados: [],
+      noShow: [],
+    };
+
+    for (const h of reservations) {
+      // Llegadas: arriving today + estatus group 2
+      if (isToday(h.llegada) && reservationStatusMap[2].includes(h.estatus)) {
+        resumen.llegadas.push(h);
+      }
+
+      // Salidas: leaving today + estatus group 1
+      if (isToday(h.salida) && reservationStatusMap[1].includes(h.estatus)) {
+        resumen.salidas.push(h);
+      }
+
+      // Colgados: salida before or equal today + estatus group 1
+      if (
+        DateTime.fromISO(h.salida).toISODate() <= todayDateString &&
+        reservationStatusMap[1].includes(h.estatus)
+      ) {
+        resumen.colgados.push(h);
+      }
+
+      // No Show
+      if (reservationStatusMap[8].includes(h.estatus)) {
+        resumen.noShow.push(h);
+      }
+    }
+
+    return resumen;
   }
 }

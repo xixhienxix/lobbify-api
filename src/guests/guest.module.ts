@@ -11,6 +11,7 @@ import { GuestsController } from './controllers/guest.controller';
 import { EstatusSchema, FoliadorSchema } from 'src/codes/_models/codes.model';
 import { BloqueosSchema } from 'src/bloqueos/_models/bloqueos.model';
 import { BloqueosModule } from 'src/bloqueos/bloqueos.module';
+import { GuestGateway } from './gateway/guest.gateway';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { BloqueosModule } from 'src/bloqueos/bloqueos.module';
     ]),
   ],
   controllers: [GuestsController],
-  providers: [GuestService],
+  providers: [GuestService, GuestGateway],
   exports: [GuestService],
 })
 export class GuestModule {}

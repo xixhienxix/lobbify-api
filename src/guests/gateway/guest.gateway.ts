@@ -12,7 +12,7 @@ import { Server, Socket } from 'socket.io';
     origin: ['https://lobify-front.web.app', 'http://localhost:4200'],
   },
 })
-export class PromosGateway
+export class GuestGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer() server: Server;
@@ -29,7 +29,7 @@ export class PromosGateway
     console.log(`Client disconnected: ${client.id}`);
   }
 
-  broadcastPromosUpdate() {
-    this.server.emit('promos-updated');
+  broadcastGuestsUpdate() {
+    this.server.emit('guests-updated');
   }
 }
