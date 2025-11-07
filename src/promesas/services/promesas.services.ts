@@ -27,22 +27,11 @@ export class PromesasService {
       });
   }
 
-  async deletePromesa(hotel: string, body: any): Promise<Promesas[]> {
-    const _id = body._id;
-
+  async deletePromesa(hotel: string, _id: string): Promise<any> {
     return this.promesasModel
-      .deleteOne({ _id: _id, hotel: hotel })
-      .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
-      })
-      .catch((err) => {
-        return err;
-      });
+      .deleteOne({ _id, hotel })
+      .then((data) => data)
+      .catch((err) => err);
   }
 
   async promesaPago(hotel: string, body: any): Promise<Promesas[]> {
@@ -96,7 +85,10 @@ export class PromesasService {
     const _id = body.id;
 
     return this.promesasModel
-      .findByIdAndUpdate({ _id, hotel: hotel }, { Estatus: body.estatus })
+      .findByIdAndUpdate(
+        { _id, hotel: hotel },
+        { Estatus: body.estatus, Aplicado: true },
+      )
       .then((data) => {
         if (!data) {
           return;

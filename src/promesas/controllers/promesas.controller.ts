@@ -28,12 +28,12 @@ export class PromesasController {
 
   @Delete('/reportes/promesa/delete/:_id')
   @UseGuards(RolesUserGuard)
-  async deleteRoom(
+  async deletePromesa(
     @Req() request: Request,
-    @Param('codigo') codigo: string,
+    @Param('_id') _id: string, // ✅ Correct parameter name
   ): Promise<any> {
     const hotel = request.headers['hotel'];
-    return this._promesasService.deletePromesa(hotel, codigo);
+    return this._promesasService.deletePromesa(hotel, _id);
   }
 
   @Post('/reportes/promesa')
