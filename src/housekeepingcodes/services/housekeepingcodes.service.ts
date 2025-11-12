@@ -3,11 +3,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { HouseKeeping } from '../models/housekeeping.model';
 import { room } from 'src/rooms/models/rooms.model';
+import { HousekeepingGateway } from '../gateway/housekeeping.gateway';
 @Injectable()
 export class HouseKeepingService {
   constructor(
     @InjectModel(HouseKeeping.name)
     private houseKeepingModel: Model<HouseKeeping>,
+    private housekeepingGateway: HousekeepingGateway,
     @InjectModel(room.name) private readonly roomsModel: Model<room>,
   ) {}
 
@@ -31,23 +33,20 @@ export class HouseKeepingService {
     return this.roomsModel
       .findOneAndUpdate(
         { hotel: hotel, Numero: body.cuarto },
-        {
-          $set: {
-            Estatus: body.estatus,
-          },
-        },
+        { $set: { Estatus: body.estatus } },
+        { new: true },
       )
-      .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+      .then((updatedRoom) => {
+        if (!updatedRoom) return null;
+
+        // ✅ Broadcast the updated room via WebSocket
+        this.housekeepingGateway.broadcastHousekeepingUpdate(updatedRoom);
+
+        return updatedRoom; // ✅ API returns updated record too
       })
       .catch((err) => {
         console.log(err);
-        return err;
+        throw err;
       });
   }
 }

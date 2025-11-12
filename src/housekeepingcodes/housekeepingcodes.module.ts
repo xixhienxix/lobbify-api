@@ -4,6 +4,7 @@ import { HouseKeeping, HouseKeepingSchema } from './models/housekeeping.model';
 import { HouseKeepingCodesController } from './controllers/housekeepingcodes.controller';
 import { HouseKeepingService } from './services/housekeepingcodes.service';
 import { room, RoomsSchema } from 'src/rooms/models/rooms.model';
+import { HousekeepingGateway } from './gateway/housekeeping.gateway';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { room, RoomsSchema } from 'src/rooms/models/rooms.model';
     ]),
   ],
   controllers: [HouseKeepingCodesController],
-  providers: [HouseKeepingService],
+  providers: [HouseKeepingService, HousekeepingGateway],
   exports: [HouseKeepingService],
 })
 export class HouseKeepingModule {}
