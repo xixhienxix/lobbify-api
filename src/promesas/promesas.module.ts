@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Promesas, PromesasSchema } from './models/promesas.model';
 import { PromesasService } from './services/promesas.services';
 import { PromesasController } from './controllers/promesas.controller';
+import { PromesasGateWay } from './gateway/promesas.gateway';
 
 @Module({
   imports: [
@@ -11,6 +12,6 @@ import { PromesasController } from './controllers/promesas.controller';
     ]),
   ],
   controllers: [PromesasController],
-  providers: [PromesasService],
+  providers: [PromesasService, PromesasGateWay],
 })
 export class PromesasModule {}
