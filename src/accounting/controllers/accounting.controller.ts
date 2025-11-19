@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Param,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -23,6 +25,24 @@ export class AccountingController {
   ): Promise<any> {
     const hotel = request.headers['hotel'];
     return this._AccountingService.getAccounts(hotel, folio);
+  }
+
+  @Get('/ingresos/range')
+  @UseGuards(RolesUserGuard)
+  async getAccountsByRange(
+    @Req() request: Request,
+    @Query('start') start: string,
+    @Query('end') end: string,
+    @Query('folio') folio?: string,
+  ): Promise<any> {
+    const hotel = request.headers['hotel'];
+
+    return this._AccountingService.getAccountsByDateRange(
+      hotel,
+      start,
+      end,
+      folio,
+    );
   }
 
   @Post('/edo_cuenta/pagos')

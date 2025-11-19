@@ -3,14 +3,26 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Edo_Cuenta } from '../models/accounting.model';
 import { huespeds } from 'src/guests/models/guest.model';
+import { AccountingGateway } from '../gateway/accounting.gateway';
 import { DateTime } from 'luxon';
 @Injectable()
 export class AccountingService {
   constructor(
+    private readonly accountingGateway: AccountingGateway,
+
     @InjectModel('Edo_Cuenta')
     private readonly accountingModel: Model<Edo_Cuenta>,
-    @InjectModel(huespeds.name) private guestModel: Model<huespeds>,
+
+    @InjectModel(huespeds.name)
+    private readonly guestModel: Model<huespeds>,
   ) {}
+
+  // Helper to avoid Duplicate Calls
+  private broadcast(data: any) {
+    if (data) {
+      this.accountingGateway.broadcastAccountingUpdate(data);
+    }
+  }
 
   async getAccounts(hotel: string, folio: string): Promise<Edo_Cuenta[]> {
     return this.accountingModel
@@ -26,6 +38,44 @@ export class AccountingService {
       .catch((err) => {
         return err;
       });
+  }
+
+  async getAccountsByDateRange(
+    hotel: string,
+    startDate: string,
+    endDate: string,
+    folio?: string,
+  ): Promise<Edo_Cuenta[]> {
+    // Build pure local ISO strings (NO timezone, NO UTC shift)
+    const start = DateTime.fromISO(startDate, { setZone: true })
+      .startOf('day')
+      .toISO({ suppressTimezone: true });
+
+    const end = DateTime.fromISO(endDate, { setZone: true })
+      .endOf('day')
+      .toISO({ suppressTimezone: true });
+
+    console.log('=== getAccountsByDateRange() ===');
+    console.log('Hotel:', hotel);
+    console.log('Start (no shift):', start);
+    console.log('End   (no shift):', end);
+
+    const query: any = {
+      hotel,
+      Fecha: { $gte: start, $lte: end },
+    };
+
+    if (folio) {
+      query.Folio = folio;
+      console.log('Using folio filter:', folio);
+    }
+
+    console.log('Mongo Query:', JSON.stringify(query, null, 2));
+
+    const results = await this.accountingModel.find(query);
+    console.log('Results Count:', results.length);
+
+    return results;
   }
 
   async addPayment(
@@ -49,6 +99,7 @@ export class AccountingService {
           ),
         );
       }
+      this.broadcast(newEntry);
 
       return {
         message: 'Added',
@@ -97,6 +148,7 @@ export class AccountingService {
       console.error('Error inserting edoCuenta array:', error);
       throw error; // Re-throw the error to the caller
     }
+    this.broadcast(insertedDocumentArray);
 
     return insertedDocumentArray;
   }
@@ -146,6 +198,7 @@ export class AccountingService {
         );
         console.log('RelatedCuentas actualizadas');
       }
+      this.broadcast(updatedDoc);
 
       return updatedDoc;
     } catch (err) {
@@ -180,7 +233,10 @@ export class AccountingService {
         { new: true }, // This option returns the updated document
       );
 
-      return updatedEdoCuenta ? [updatedEdoCuenta] : [];
+      if (updatedEdoCuenta) {
+        this.broadcast(updatedEdoCuenta);
+        return [updatedEdoCuenta];
+      }
     } catch (err) {
       console.error('Error updating the payment:', err);
       throw new Error('Error updating the payment');
@@ -208,6 +264,7 @@ export class AccountingService {
           return;
         }
         if (data) {
+          this.broadcast(data);
           return data;
         }
       })
@@ -242,6 +299,7 @@ export class AccountingService {
 
       // If update is successful, return the updated reserva document directly
       if (updatedDocument) {
+        this.broadcast(updatedDocument);
         return [updatedDocument]; // Wrap the updated document in an array
       } else {
         console.warn('No matching reserva document found for update');

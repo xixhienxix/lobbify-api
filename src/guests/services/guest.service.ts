@@ -56,6 +56,27 @@ export class GuestService {
       });
   }
 
+  async findByDateRange(
+    hotel: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<huespeds[]> {
+    // Pure local dates, no timezone conversion
+    const start = DateTime.fromISO(startDate, { setZone: true })
+      .startOf('day')
+      .toISO({ suppressTimezone: true }); // <-- NO Z, NO SHIFT
+
+    const end = DateTime.fromISO(endDate, { setZone: true })
+      .endOf('day')
+      .toISO({ suppressTimezone: true });
+
+    return this.guestModel.find({
+      hotel,
+      llegada: { $lte: end },
+      salida: { $gte: start },
+    });
+  }
+
   async findbyCode(hotel: string, code: string): Promise<huespeds[]> {
     return this.guestModel
       .find({ habitacion: code, hotel: hotel })
@@ -739,7 +760,11 @@ export class GuestService {
       }
 
       // Salidas: leaving today + estatus group 1
-      if (isToday(h.salida) && reservationStatusMap[1].includes(h.estatus)) {
+      if (
+        isToday(h.salida) &&
+        (reservationStatusMap[1].includes(h.estatus) ||
+          reservationStatusMap[4].includes(h.estatus))
+      ) {
         resumen.salidas.push(h);
       }
 

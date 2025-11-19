@@ -4,6 +4,7 @@ import { AccountingController } from './controllers/accounting.controller';
 import { AccountingService } from './services/accounting.service';
 import { EdoCuentaSchema } from './models/accounting.model';
 import { GuestSchema, huespeds } from 'src/guests/models/guest.model';
+import { AccountingGateway } from './gateway/accounting.gateway';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { GuestSchema, huespeds } from 'src/guests/models/guest.model';
     ]),
   ],
   controllers: [AccountingController],
-  providers: [AccountingService],
+  providers: [AccountingService, AccountingGateway],
   exports: [AccountingService],
 })
 export class AccountingModule {}

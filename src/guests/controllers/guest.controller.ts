@@ -24,6 +24,18 @@ export class GuestsController {
     return this._GuestService.findAll(hotel);
   }
 
+  @Get('/huesped/range')
+  @UseGuards(RolesUserGuard)
+  async findGuestsByRange(
+    @Req() request: Request,
+    @Query('start') start: string,
+    @Query('end') end: string,
+  ): Promise<any> {
+    const hotel = request.headers['hotel'];
+
+    return this._GuestService.findByDateRange(hotel, start, end);
+  }
+
   @Get('/huesped/filteredRsv')
   @UseGuards(RolesUserGuard)
   async searchRsv(

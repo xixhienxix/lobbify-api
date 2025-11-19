@@ -117,7 +117,6 @@ export class PromesasService {
       }
 
       // 🔥 The actual folio comes from DB, not body
-      console.log('updatePromesaEstatus:', updated);
       this.promesasGateway.broadcastPromesasUpdate(updated.Folio);
 
       return updated;
