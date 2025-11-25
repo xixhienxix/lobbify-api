@@ -37,6 +37,8 @@ export class Edo_Cuenta {
   Pagado: boolean;
   @Prop()
   ID_Pago: string;
+  @Prop()
+  Descuento_Aplicado: boolean;
   @Prop({ type: [Object] })
   RelatedCuentas: Edo_Cuenta[];
 }

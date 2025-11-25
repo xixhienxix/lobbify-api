@@ -52,6 +52,13 @@ export class AccountingController {
     return this._AccountingService.addPayment(hotel, body);
   }
 
+  @Post('/edo_cuenta/descuento')
+  @UseGuards(RolesUserGuard)
+  async addDscByConcept(@Body() body, @Req() request: Request) {
+    const hotel = request.headers['hotel'];
+    return this._AccountingService.addDscProperty(hotel, body);
+  }
+
   @Post('/edo_cuenta/hospedaje')
   @UseGuards(RolesUserGuard)
   async updateHuesped(@Body() body, @Req() request: Request) {

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Edo_Cuenta } from '../models/accounting.model';
@@ -55,11 +55,6 @@ export class AccountingService {
       .endOf('day')
       .toISO({ suppressTimezone: true });
 
-    console.log('=== getAccountsByDateRange() ===');
-    console.log('Hotel:', hotel);
-    console.log('Start (no shift):', start);
-    console.log('End   (no shift):', end);
-
     const query: any = {
       hotel,
       Fecha: { $gte: start, $lte: end },
@@ -67,7 +62,6 @@ export class AccountingService {
 
     if (folio) {
       query.Folio = folio;
-      console.log('Using folio filter:', folio);
     }
 
     console.log('Mongo Query:', JSON.stringify(query, null, 2));
@@ -109,6 +103,34 @@ export class AccountingService {
       console.error('Error adding payment:', err);
       throw err;
     }
+  }
+
+  async addDscProperty(hotel: string, body: any) {
+    const conceptos = body.conceptos || [];
+
+    if (!Array.isArray(conceptos) || conceptos.length === 0) {
+      return {
+        message: 'Error al aplicar el descuento',
+        updated: false,
+      };
+    }
+
+    const ids = conceptos.map((c) => c._id);
+
+    const result = await this.accountingModel.updateMany(
+      {
+        _id: { $in: ids },
+        hotel: hotel,
+      },
+      {
+        $set: { Descuento_Aplicado: true },
+      },
+    );
+
+    return {
+      message: 'Descuentos aplicados correctamente',
+      updated: result.modifiedCount,
+    };
   }
 
   async addHospedaje(hotel: string, body: any): Promise<Edo_Cuenta[]> {
@@ -192,7 +214,7 @@ export class AccountingService {
           RelatedCuentas.map((c: any) =>
             this.accountingModel.updateOne(
               { _id: c._id },
-              { $set: { ID_Pago: '' } },
+              { $set: { ID_Pago: '', Descuento_Aplicado: false } },
             ),
           ),
         );
