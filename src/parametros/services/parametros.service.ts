@@ -1,7 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Parametros } from '../models/parametros.model';
 import { Model } from 'mongoose';
+import { ADMIN_FIELDS } from 'src/constraints/admin-fields-constraints';
 
 @Injectable()
 export class ParametrosService {
@@ -9,20 +15,42 @@ export class ParametrosService {
     @InjectModel('Parametros') private parametrosModel: Model<Parametros>,
   ) {}
 
-  async getAll(hotel: string): Promise<Parametros> {
-    return this.parametrosModel
-      .find({ hotel: hotel })
-      .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
-      })
-      .catch((err) => {
-        return err;
-      });
+  private readonly logger = new Logger(ParametrosService.name);
+
+  async getAll(
+    hotel: string,
+    role: string,
+    restrictedFields: readonly string[],
+  ): Promise<Parametros> {
+    const projection =
+      role === 'ADMIN'
+        ? {}
+        : restrictedFields.reduce((acc, field) => ({ ...acc, [field]: 0 }), {});
+    try {
+      const data = await this.parametrosModel
+        .findOne({ hotel })
+        .select(projection)
+        .lean()
+        .exec();
+
+      if (!data) {
+        throw new NotFoundException(`No parametros found for hotel: ${hotel}`);
+      }
+      console.log('PARAMETROS GET', data);
+      return data;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Database error fetching parametros for hotel ${hotel}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        'Failed to fetch parametros configuration',
+      );
+    }
   }
 
   async postParametros(hotel: string, body: any) {

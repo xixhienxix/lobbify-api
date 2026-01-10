@@ -24,6 +24,8 @@ import { MailService } from './mail/mail.service';
 import { ConfigModule } from '@nestjs/config';
 import { MailController } from './mail/email.controller';
 import { PackagesModule } from './paquetes/paquetes.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { RoleFieldFilterInterceptor } from './interceptors/role-file-filter-interceptor';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -62,7 +64,14 @@ import { PackagesModule } from './paquetes/paquetes.module';
     }),
   ],
   controllers: [AppController, MailController],
-  providers: [AppService, MailService],
+  providers: [
+    AppService,
+    MailService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RoleFieldFilterInterceptor,
+    },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

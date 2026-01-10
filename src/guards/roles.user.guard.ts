@@ -32,7 +32,6 @@ export class RolesUserGuard implements CanActivate {
   ): boolean | Promise<boolean> | Observable<boolean> {
     const req = context.switchToHttp().getRequest();
 
-    // ✅ Allow bypass via internal secret header
     const internalSecret = this.config.get('INTERNAL_APP_SECRET');
 
     const header =

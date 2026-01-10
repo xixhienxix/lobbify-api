@@ -15,6 +15,10 @@ export class LoginController {
     @Body('username') username: string,
     @Body('password') plainTextPassword: string,
   ): Promise<any> {
+    console.log('usuario:', {
+      username: username,
+      password: plainTextPassword,
+    });
     const usuariosResultQuery = await this.userModel
       .findOne({ username: username, password: plainTextPassword })
       .lean()

@@ -35,6 +35,18 @@ export class Parametros {
   iddleTimer: number;
   @Prop()
   maxPersonas: number;
+  @Prop()
+  wifi: string;
+  @Prop()
+  wifiPass: string;
+  /** ADMIN PROPERTIES */
+  @Prop()
+  nombre_cuenta: string;
+  @Prop()
+  cuenta: string;
+  @Prop()
+  clabe: string;
+  @Prop()
+  fecha_limite_pago: number;
 }
-
 export const ParametrosSchema = SchemaFactory.createForClass(Parametros);
