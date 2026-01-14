@@ -159,7 +159,7 @@ export class GuestService {
         },
         { new: true }, // This option ensures the modified document is returned
       );
-
+      this.guestsGateway.broadcastGuestsUpdate();
       return updatedHuesped ? [updatedHuesped] : [];
     } catch (err) {
       console.error(err);

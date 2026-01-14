@@ -48,5 +48,11 @@ export class Parametros {
   clabe: string;
   @Prop()
   fecha_limite_pago: number;
+  @Prop()
+  infoAdicional: string;
+  @Prop()
+  urlMapa: string;
+  @Prop()
+  paginaWeb: string;
 }
 export const ParametrosSchema = SchemaFactory.createForClass(Parametros);
