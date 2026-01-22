@@ -102,6 +102,13 @@ export class GuestsController {
     return this._GuestService.updateStatus(hotel, body);
   }
 
+  @Post('/actualiza/estatus/checkout')
+  @UseGuards(RolesUserGuard)
+  async updateCheckOut(@Req() request: Request, @Body() body): Promise<any> {
+    const hotel = request.headers['hotel'];
+    return this._GuestService.updateColgadoStatus(hotel, body);
+  }
+
   // Huesped Details
   @Get('/details')
   @UseGuards(RolesUserGuard)

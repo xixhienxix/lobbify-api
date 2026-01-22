@@ -10,7 +10,6 @@ export class AppService {
   constructor() {
     this.loadVersion();
   }
-
   private loadVersion() {
     try {
       const packageJsonPath = path.join(__dirname, '../package.json');

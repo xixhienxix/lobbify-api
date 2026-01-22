@@ -25,10 +25,13 @@ import { ConfigModule } from '@nestjs/config';
 import { MailController } from './mail/email.controller';
 import { PackagesModule } from './paquetes/paquetes.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { RoleFieldFilterInterceptor } from './interceptors/role-file-filter-interceptor';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
+    ScheduleModule,
     AuthModule,
     PackagesModule,
     BloqueosModule,

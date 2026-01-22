@@ -76,6 +76,8 @@ export class huespeds {
   hotel: string;
   @Prop({ type: Object })
   desgloseEdoCuenta: any;
+  @Prop({ default: false }) // ← Add default value
+  lateCheckOut: string;
 }
 
 export const GuestSchema = SchemaFactory.createForClass(huespeds);
@@ -144,6 +146,16 @@ export class HuespedDetails {
   cfdi: string;
   @Prop()
   razon_social: string;
+  @Prop()
+  color_Auto: string;
+  @Prop()
+  modelo: string;
+  @Prop()
+  type_Auto: string;
+  @Prop()
+  placa: string;
+  @Prop()
+  lateCheckOut: string;
 }
 
 export const HuespedDetailsSchema =

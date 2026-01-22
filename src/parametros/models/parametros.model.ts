@@ -54,5 +54,9 @@ export class Parametros {
   urlMapa: string;
   @Prop()
   paginaWeb: string;
+  @Prop()
+  multa: number;
+  @Prop()
+  whatsapp: string;
 }
 export const ParametrosSchema = SchemaFactory.createForClass(Parametros);

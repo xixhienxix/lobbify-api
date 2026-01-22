@@ -591,6 +591,10 @@ export class GuestService {
             cfdi: body.huesped.cfdi,
             razon_social: body.huesped.razon_social,
             rfc: body.huesped.rfc,
+            modelo: body.huesped.modelo,
+            type_Auto: body.huesped.type_Auto,
+            placa: body.huesped.placa,
+            color_Auto: body.huesped.color_Auto,
           },
         },
         { upsert: true },
@@ -783,5 +787,309 @@ export class GuestService {
     }
 
     return resumen;
+  }
+
+  async findTodayLateCheckouts(hotelName: string, cutoffTime = '12:00') {
+    const [cutoffHours, cutoffMinutes] = cutoffTime.split(':').map(Number);
+
+    // Get current server time
+    const now = new Date();
+
+    console.log('=== LATE CHECKOUT QUERY DEBUG ===');
+    console.log('Hotel:', hotelName);
+    console.log('Cutoff time:', cutoffTime);
+    console.log('Server time:', now.toISOString());
+    console.log('Server local time:', now.toString());
+    console.log('Looking for checkouts before:', {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      day: now.getDate(),
+      cutoffMinutes: cutoffHours * 60 + cutoffMinutes,
+    });
+
+    // First, let's see all "Huesped en Casa" reservations
+    const allGuests = await this.guestModel
+      .find({
+        hotel: hotelName,
+        estatus: 'Huesped en Casa',
+      })
+      .lean();
+
+    console.log(`Total "Huesped en Casa" reservations: ${allGuests.length}`);
+
+    if (allGuests.length > 0) {
+      console.log('Sample reservation salida dates:');
+      allGuests.forEach((g) => {
+        console.log(
+          `  - Folio ${g.folio}: ${g.salida} (type: ${typeof g.salida})`,
+        );
+      });
+    }
+
+    // Now run the aggregation WITH string-to-date conversion
+    const resultsWithDebug = await this.guestModel.aggregate([
+      {
+        $match: {
+          hotel: hotelName,
+          estatus: 'Huesped en Casa',
+        },
+      },
+      {
+        $addFields: {
+          // Convert salida to Date if it's a string
+          salidaDate: {
+            $cond: {
+              if: { $eq: [{ $type: '$salida' }, 'string'] },
+              then: { $dateFromString: { dateString: '$salida' } },
+              else: '$salida',
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          salidaYear: { $year: '$salidaDate' },
+          salidaMonth: { $month: '$salidaDate' },
+          salidaDay: { $dayOfMonth: '$salidaDate' },
+          salidaHour: { $hour: '$salidaDate' },
+          salidaMinute: { $minute: '$salidaDate' },
+          salidaTotalMinutes: {
+            $add: [
+              { $multiply: [{ $hour: '$salidaDate' }, 60] },
+              { $minute: '$salidaDate' },
+            ],
+          },
+        },
+      },
+    ]);
+
+    console.log('Reservations with extracted date parts:');
+    resultsWithDebug.forEach((r) => {
+      console.log(`  Folio ${r.folio}:`);
+      console.log(`    Salida: ${r.salida}`);
+      console.log(
+        `    Extracted: ${r.salidaYear}-${r.salidaMonth}-${r.salidaDay} ${r.salidaHour}:${r.salidaMinute} (${r.salidaTotalMinutes} mins)`,
+      );
+      console.log(
+        `    Today: ${now.getFullYear()}-${
+          now.getMonth() + 1
+        }-${now.getDate()}`,
+      );
+      console.log(`    Cutoff: ${cutoffHours * 60 + cutoffMinutes} mins`);
+
+      // Manual check
+      const isPastDate =
+        r.salidaYear < now.getFullYear() ||
+        (r.salidaYear === now.getFullYear() &&
+          r.salidaMonth < now.getMonth() + 1) ||
+        (r.salidaYear === now.getFullYear() &&
+          r.salidaMonth === now.getMonth() + 1 &&
+          r.salidaDay < now.getDate());
+
+      const isTodayAfterCutoff =
+        r.salidaYear === now.getFullYear() &&
+        r.salidaMonth === now.getMonth() + 1 &&
+        r.salidaDay === now.getDate() &&
+        r.salidaTotalMinutes > cutoffHours * 60 + cutoffMinutes;
+
+      console.log(`    Is past date? ${isPastDate}`);
+      console.log(`    Is today after cutoff? ${isTodayAfterCutoff}`);
+      console.log(`    SHOULD MATCH? ${isPastDate || isTodayAfterCutoff}`);
+    });
+
+    // Now run the actual filtered query with string-to-date conversion
+    const results = await this.guestModel.aggregate([
+      {
+        $match: {
+          hotel: hotelName,
+          estatus: 'Huesped en Casa',
+        },
+      },
+      {
+        $addFields: {
+          // Convert salida to Date if it's a string
+          salidaDate: {
+            $cond: {
+              if: { $eq: [{ $type: '$salida' }, 'string'] },
+              then: { $dateFromString: { dateString: '$salida' } },
+              else: '$salida',
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          salidaYear: { $year: '$salidaDate' },
+          salidaMonth: { $month: '$salidaDate' },
+          salidaDay: { $dayOfMonth: '$salidaDate' },
+          salidaHour: { $hour: '$salidaDate' },
+          salidaMinute: { $minute: '$salidaDate' },
+          salidaTotalMinutes: {
+            $add: [
+              { $multiply: [{ $hour: '$salidaDate' }, 60] },
+              { $minute: '$salidaDate' },
+            ],
+          },
+        },
+      },
+      {
+        $match: {
+          $or: [
+            // Case 1: Checkout date is in the past (any day before today)
+            {
+              $expr: {
+                $or: [
+                  { $lt: ['$salidaYear', now.getFullYear()] },
+                  {
+                    $and: [
+                      { $eq: ['$salidaYear', now.getFullYear()] },
+                      { $lt: ['$salidaMonth', now.getMonth() + 1] },
+                    ],
+                  },
+                  {
+                    $and: [
+                      { $eq: ['$salidaYear', now.getFullYear()] },
+                      { $eq: ['$salidaMonth', now.getMonth() + 1] },
+                      { $lt: ['$salidaDay', now.getDate()] },
+                    ],
+                  },
+                ],
+              },
+            },
+            // Case 2: Checkout is TODAY but time is after cutoff
+            {
+              $expr: {
+                $and: [
+                  { $eq: ['$salidaYear', now.getFullYear()] },
+                  { $eq: ['$salidaMonth', now.getMonth() + 1] },
+                  { $eq: ['$salidaDay', now.getDate()] },
+                  {
+                    $gt: [
+                      '$salidaTotalMinutes',
+                      cutoffHours * 60 + cutoffMinutes,
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+      {
+        // Remove temporary fields
+        $project: {
+          salidaDate: 0,
+          salidaYear: 0,
+          salidaMonth: 0,
+          salidaDay: 0,
+          salidaHour: 0,
+          salidaMinute: 0,
+          salidaTotalMinutes: 0,
+        },
+      },
+    ]);
+
+    console.log(`Query matched ${results.length} late checkouts`);
+    if (results.length > 0) {
+      console.log('Matched folios:', results.map((r) => r.folio).join(', '));
+    }
+    console.log('=== END DEBUG ===\n');
+
+    return results;
+  }
+
+  async updateColgadoStatus(
+    hotel: string,
+    body: { huesped: { folio: string } },
+  ): Promise<{ matched: number; modified: number }> {
+    const folio = body?.huesped?.folio;
+
+    if (!hotel || !folio) {
+      throw new Error('Hotel and folio are required to update Colgado status');
+    }
+
+    const { matchedCount, modifiedCount } = await this.guestModel.updateMany(
+      {
+        hotel,
+        folio,
+      },
+      {
+        $set: { lateCheckOut: 'Colgado' },
+      },
+    );
+
+    return {
+      matched: matchedCount,
+      modified: modifiedCount,
+    };
+  }
+
+  async updateLateCheckOutStatus(hotel: string, reservationsFolios: string[]) {
+    console.log('=== UPDATE LATE CHECKOUT DEBUG ===');
+    console.log('Hotel:', hotel);
+    console.log('Folios to update:', reservationsFolios);
+    console.log('Count:', reservationsFolios.length);
+
+    if (reservationsFolios.length === 0) {
+      console.log('No folios to update, skipping...');
+      console.log('=== END UPDATE DEBUG ===\n');
+      return { modifiedCount: 0, matchedCount: 0 };
+    }
+
+    try {
+      // Debug: Check what we're actually querying
+      console.log('Query filter:', {
+        folio: { $in: reservationsFolios },
+        hotel: hotel,
+      });
+
+      // First, let's see if we can find these documents
+      const foundDocs = await this.guestModel
+        .find({
+          folio: { $in: reservationsFolios },
+          hotel: hotel,
+        })
+        .lean();
+
+      console.log(`Found ${foundDocs.length} documents matching the query`);
+      if (foundDocs.length === 0) {
+        console.log('❌ No documents found! Checking one folio directly...');
+
+        const sampleFolio = reservationsFolios[0];
+        const directCheck = await this.guestModel
+          .findOne({ folio: sampleFolio, hotel })
+          .lean();
+        console.log(
+          `Direct check for folio "${sampleFolio}":`,
+          directCheck ? 'FOUND' : 'NOT FOUND',
+        );
+
+        if (directCheck) {
+          console.log('Folio type in DB:', typeof directCheck.folio);
+          console.log('Folio value in DB:', directCheck.folio);
+        }
+      }
+
+      // Single bulk update - updates all matching documents at once
+      const result = await this.guestModel.updateMany(
+        {
+          folio: { $in: reservationsFolios },
+          hotel: hotel,
+        },
+        { $set: { lateCheckOut: 'Late Check-Out' } },
+      );
+
+      console.log('Update result:', result);
+      console.log(
+        `✅ Matched: ${result.matchedCount}, Modified: ${result.modifiedCount}`,
+      );
+      console.log('=== END UPDATE DEBUG ===\n');
+
+      return result;
+    } catch (err) {
+      console.error('❌ Late checkout update failed:', err);
+      console.log('=== END UPDATE DEBUG ===\n');
+      throw err;
+    }
   }
 }

@@ -75,6 +75,8 @@ export class huesped {
   hotel: string;
   @Prop({ type: Object })
   desgloseEdoCuenta: any;
+  @Prop()
+  lateCheckOut: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(huesped);
