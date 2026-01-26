@@ -149,20 +149,143 @@ export class GuestService {
   async onModificaHuesped(hotel: string, data: any): Promise<huespeds[]> {
     const huespedModificado = data.data[0];
 
+    console.log('=== onModificaHuesped DEBUG ===');
+    console.log('Folio:', huespedModificado.folio);
+    console.log('Hotel:', hotel);
+    console.log('Salida value:', huespedModificado.salida);
+    console.log('Current lateCheckOut:', huespedModificado.lateCheckOut);
+
     try {
+      let shouldClearLateCheckout = false;
+
+      // If salida is being updated, check if it's in the future using MongoDB aggregation
+      if (huespedModificado.salida) {
+        console.log('\n--- Checking if salida is in the future ---');
+        console.log('Salida to check:', huespedModificado.salida);
+
+        // Use MongoDB to parse the date and compare (no JavaScript Date objects)
+        const dateCheck = await this.guestModel.aggregate([
+          {
+            $project: {
+              // Parse the salida string using MongoDB
+              parsedSalida: {
+                $dateFromString: {
+                  dateString: huespedModificado.salida,
+                },
+              },
+              // Get current date/time in MongoDB
+              now: '$$NOW',
+            },
+          },
+          {
+            $project: {
+              // Extract date components from salida
+              salidaYear: { $year: '$parsedSalida' },
+              salidaMonth: { $month: '$parsedSalida' },
+              salidaDay: { $dayOfMonth: '$parsedSalida' },
+              // Extract date components from now
+              nowYear: { $year: '$now' },
+              nowMonth: { $month: '$now' },
+              nowDay: { $dayOfMonth: '$now' },
+            },
+          },
+          {
+            $project: {
+              salidaYear: 1,
+              salidaMonth: 1,
+              salidaDay: 1,
+              nowYear: 1,
+              nowMonth: 1,
+              nowDay: 1,
+              // Check if salida is AFTER today (future only)
+              isFuture: {
+                $or: [
+                  { $gt: ['$salidaYear', '$nowYear'] },
+                  {
+                    $and: [
+                      { $eq: ['$salidaYear', '$nowYear'] },
+                      { $gt: ['$salidaMonth', '$nowMonth'] },
+                    ],
+                  },
+                  {
+                    $and: [
+                      { $eq: ['$salidaYear', '$nowYear'] },
+                      { $eq: ['$salidaMonth', '$nowMonth'] },
+                      { $gt: ['$salidaDay', '$nowDay'] },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          {
+            $limit: 1,
+          },
+        ]);
+
+        console.log('Date check result:', JSON.stringify(dateCheck, null, 2));
+
+        if (dateCheck.length > 0) {
+          console.log('Salida date components:', {
+            year: dateCheck[0].salidaYear,
+            month: dateCheck[0].salidaMonth,
+            day: dateCheck[0].salidaDay,
+          });
+          console.log('Today date components:', {
+            year: dateCheck[0].nowYear,
+            month: dateCheck[0].nowMonth,
+            day: dateCheck[0].nowDay,
+          });
+          console.log('Is future?', dateCheck[0].isFuture);
+        } else {
+          console.log('❌ No date check results returned');
+        }
+
+        // Set flag based on MongoDB's date comparison
+        shouldClearLateCheckout = dateCheck.length > 0 && dateCheck[0].isFuture;
+        console.log('shouldClearLateCheckout:', shouldClearLateCheckout);
+      } else {
+        console.log('⚠️ No salida field in huespedModificado');
+      }
+
+      // Prepare update object
+      const updateObject = {
+        ...huespedModificado,
+      };
+
+      // Clear lateCheckOut if salida is in the future
+      if (shouldClearLateCheckout) {
+        console.log('✅ Clearing lateCheckOut because salida is in the future');
+        updateObject.lateCheckOut = '';
+      } else {
+        console.log(
+          '⏹️ NOT clearing lateCheckOut (salida is not in future or missing)',
+        );
+      }
+
+      console.log(
+        '\n--- Update object lateCheckOut value:',
+        updateObject.lateCheckOut,
+      );
+
+      // Update the document
       const updatedHuesped = await this.guestModel.findOneAndUpdate(
         { folio: huespedModificado.folio, hotel: hotel },
-        {
-          $set: {
-            ...huespedModificado,
-          },
-        },
-        { new: true }, // This option ensures the modified document is returned
+        { $set: updateObject },
+        { new: true },
       );
+
+      console.log('✅ Updated successfully');
+      if (updatedHuesped) {
+        console.log('Updated lateCheckOut in DB:', updatedHuesped.lateCheckOut);
+      }
+      console.log('=== END DEBUG ===\n');
+
       this.guestsGateway.broadcastGuestsUpdate();
       return updatedHuesped ? [updatedHuesped] : [];
     } catch (err) {
-      console.error(err);
+      console.error('❌ Error updating guest:', err);
+      console.log('=== END DEBUG (WITH ERROR) ===\n');
       throw new Error('Error updating the guest');
     }
   }
@@ -903,6 +1026,7 @@ export class GuestService {
         $match: {
           hotel: hotelName,
           estatus: 'Huesped en Casa',
+          lateCheckOut: { $ne: 'Colgado' },
         },
       },
       {
