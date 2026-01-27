@@ -853,7 +853,6 @@ export class GuestService {
       { $unwind: { path: '$housekeeping', preserveNullAndEmptyArrays: true } },
     ];
 
-    // ✅ Only push $match if there are filters to apply
     if (Object.keys(matchStage).length > 0) {
       pipeline.unshift({ $match: matchStage });
     }

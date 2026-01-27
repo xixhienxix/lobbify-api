@@ -20,20 +20,35 @@ export class HotelSchedulerService implements OnModuleInit {
   }
 
   async loadAllHotelSchedules() {
-    const hotels = await this.parametrosService.getAllHotels();
+    console.log('📊 Fetching hotels from database...');
 
-    for (const hotel of hotels) {
-      const parameters = await this.parametrosService.getHotelParams(hotel);
+    try {
+      const hotels = await this.parametrosService.getAllHotels();
+      console.log(`✅ Found ${hotels.length} hotels`);
 
-      if (parameters?.checkOut) {
-        // Convert time like "17:00" to cron format "0 17 * * *"
-        const cronExpression = this.timeToCron(parameters.checkOut);
+      for (const hotel of hotels) {
+        console.log(`\n📍 Processing hotel: ${hotel}`);
 
-        this.scheduleHotelJob(hotel, cronExpression, parameters);
+        const parameters = await this.parametrosService.getHotelParams(hotel);
+
+        if (parameters?.checkOut) {
+          const cronExpression = this.timeToCron(parameters.checkOut);
+          console.log(`   ⏰ CheckOut time: ${parameters.checkOut}`);
+          console.log(
+            `   🌍 Timezone: ${parameters.codigoZona || 'UTC (default)'}`,
+          );
+
+          this.scheduleHotelJob(hotel, cronExpression, parameters);
+        } else {
+          console.warn(`   ⚠️ No checkOut time found for hotel ${hotel}`);
+        }
       }
-    }
 
-    console.log(`Loaded ${hotels.length} hotel schedules`);
+      console.log(`\n🎉 Successfully loaded ${hotels.length} hotel schedules`);
+    } catch (error) {
+      console.error('💥 Error loading hotel schedules:', error);
+      throw error;
+    }
   }
 
   private scheduleHotelJob(
@@ -41,14 +56,29 @@ export class HotelSchedulerService implements OnModuleInit {
     cronExpression: string,
     parameters: Parametros,
   ) {
-    const job = new CronJob(cronExpression, async () => {
-      await this.executeHotelTask(hotelId, parameters);
-    });
+    // Use the timezone from database, fallback to UTC if not provided
+    const timezone = parameters.codigoZona || 'UTC';
+
+    const job = new CronJob(
+      cronExpression,
+      async () => {
+        console.log(
+          `🔔 CRON JOB EXECUTING for hotel ${hotelId} at ${new Date().toISOString()}`,
+        );
+        await this.executeHotelTask(hotelId, parameters);
+      },
+      null,
+      true,
+      timezone, // Use timezone from database
+    );
 
     this.schedulerRegistry.addCronJob(`hotel-${hotelId}`, job);
-    job.start();
 
-    console.log(`Scheduled job for hotel ${hotelId}: ${cronExpression}`);
+    console.log(`✅ Scheduled job for hotel ${hotelId}`);
+    console.log(`   📅 Cron expression: ${cronExpression}`);
+    console.log(`   🌍 Timezone: ${timezone}`);
+    console.log(`   ⏰ Next run: ${job.nextDate()?.toISO()}`);
+    console.log(`   ⏰ Next run (UTC): ${job.nextDate()?.toUTC().toISO()}`);
   }
 
   private async executeHotelTask(hotelId: string, parameters: Parametros) {
