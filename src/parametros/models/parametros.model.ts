@@ -58,5 +58,20 @@ export class Parametros {
   multa: number;
   @Prop()
   whatsapp: string;
+  /** DEPÓSITO POR RESERVACIÓN */
+
+  @Prop({
+    type: String,
+    enum: ['percentage', 'quantity'],
+    default: 'percentage',
+  })
+  depositType: 'percentage' | 'quantity';
+
+  @Prop({
+    type: Number,
+    default: 0,
+    min: 0,
+  })
+  depositValue: number;
 }
 export const ParametrosSchema = SchemaFactory.createForClass(Parametros);
