@@ -14,6 +14,17 @@ export class HotelSchedulerService implements OnModuleInit {
     private reservatrionsService: GuestService,
   ) {}
 
+  private executionHistory: Array<{
+    hotelId: string;
+    executedAt: Date;
+    status: 'success' | 'error';
+    lateCheckoutsFound: number;
+    updated: number;
+    error?: string;
+  }> = [];
+
+  private readonly MAX_HISTORY = 100;
+
   async onModuleInit() {
     console.log('Loading all hotel schedules...');
     await this.loadAllHotelSchedules();
@@ -157,5 +168,57 @@ export class HotelSchedulerService implements OnModuleInit {
     await this.executeHotelTask(hotelId, parameters);
 
     console.log('🧪 TEST COMPLETE');
+  }
+
+  private addExecutionLog(log: {
+    hotelId: string;
+    executedAt: Date;
+    status: 'success' | 'error';
+    lateCheckoutsFound: number;
+    updated: number;
+    error?: string;
+  }) {
+    this.executionHistory.unshift(log); // Add to beginning
+
+    // Keep only last MAX_HISTORY entries
+    if (this.executionHistory.length > this.MAX_HISTORY) {
+      this.executionHistory = this.executionHistory.slice(0, this.MAX_HISTORY);
+    }
+  }
+
+  getExecutionHistory(hotelId?: string, limit = 50) {
+    let history = this.executionHistory;
+
+    if (hotelId) {
+      history = history.filter((log) => log.hotelId === hotelId);
+    }
+
+    return history.slice(0, limit);
+  }
+
+  getExecutionStats(hotelId?: string) {
+    let history = this.executionHistory;
+
+    if (hotelId) {
+      history = history.filter((log) => log.hotelId === hotelId);
+    }
+
+    const total = history.length;
+    const successful = history.filter((log) => log.status === 'success').length;
+    const failed = history.filter((log) => log.status === 'error').length;
+    const totalCheckoutsProcessed = history.reduce(
+      (sum, log) => sum + log.updated,
+      0,
+    );
+
+    const lastExecution = history[0];
+
+    return {
+      total,
+      successful,
+      failed,
+      totalCheckoutsProcessed,
+      lastExecution,
+    };
   }
 }

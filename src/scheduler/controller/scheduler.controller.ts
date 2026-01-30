@@ -1,5 +1,5 @@
 // Create a new controller or add to an existing one
-import { Controller, Get, Post, Param } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query } from '@nestjs/common';
 import { HotelSchedulerService } from '../scheduler.tasks';
 import { SchedulerRegistry } from '@nestjs/schedule';
 
@@ -23,6 +23,27 @@ export class SchedulerController {
     };
   }
 
+  @Get('history')
+  getExecutionHistory(
+    @Query('hotel') hotel?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const hotelName = hotel
+      ? decodeURIComponent(hotel).replace(/-/g, ' ')
+      : undefined;
+    const limitNum = limit ? parseInt(limit, 10) : 50;
+
+    const history = this.schedulerService.getExecutionHistory(
+      hotelName,
+      limitNum,
+    );
+
+    return {
+      total: history.length,
+      history,
+    };
+  }
+
   @Get('jobs')
   getJobs() {
     const jobs = this.schedulerRegistry.getCronJobs();
@@ -43,6 +64,20 @@ export class SchedulerController {
       totalJobs: jobList.length,
       serverTime: new Date().toISOString(),
       jobs: jobList,
+    };
+  }
+
+  @Get('stats')
+  getStats(@Query('hotel') hotel?: string) {
+    const hotelName = hotel
+      ? decodeURIComponent(hotel).replace(/-/g, ' ')
+      : undefined;
+    const stats = this.schedulerService.getExecutionStats(hotelName);
+
+    return {
+      serverTime: new Date().toISOString(),
+      hotel: hotelName || 'All Hotels',
+      stats,
     };
   }
 
