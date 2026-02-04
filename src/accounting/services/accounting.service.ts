@@ -179,11 +179,15 @@ export class AccountingService {
     hotel: string,
     body: any,
   ): Promise<Edo_Cuenta | null> {
-    const { _id, estatus, fechaCancelado, autorizo, edoCuenta } = body;
-    const { RelatedCuentas } = edoCuenta;
+    const { _id, estatus, fechaCancelado, autorizo } = body;
+
+    console.log('--- updatePaymentStatus START ---');
+    console.log({ hotel, _id, estatus });
 
     try {
-      // 1. Actualizar documento principal
+      /**
+       * 1️⃣ Update main document (DESCUENTO / PAGO)
+       */
       const updatedDoc = await this.accountingModel.findOneAndUpdate(
         { _id, hotel },
         {
@@ -192,39 +196,67 @@ export class AccountingService {
             Fecha_Cancelado: fechaCancelado,
             Autorizo: autorizo,
             ID_Pago: '',
+            Descuento_Aplicado: false,
           },
         },
-        { new: true }, // retorna documento actualizado
+        { new: true },
       );
 
       if (!updatedDoc) {
-        console.log(`No se encontró documento con ID ${_id} en hotel ${hotel}`);
-        return null; // 🚫 no seguimos con RelatedCuentas
+        console.warn(`❌ Documento no encontrado: ${_id}`);
+        return null;
       }
 
-      console.log('Documento principal actualizado:', updatedDoc);
+      console.log(
+        '✅ Documento principal actualizado:',
+        updatedDoc._id.toString(),
+      );
 
-      // 2. Si principal OK y es Abono, limpiar RelatedCuentas
-      if (
-        edoCuenta?.Abono &&
-        edoCuenta.Abono !== 0 &&
-        Array.isArray(RelatedCuentas)
-      ) {
-        await Promise.all(
-          RelatedCuentas.map((c: any) =>
-            this.accountingModel.updateOne(
-              { _id: c._id },
-              { $set: { ID_Pago: '', Descuento_Aplicado: false } },
-            ),
-          ),
-        );
-        console.log('RelatedCuentas actualizadas');
+      /**
+       * 2️⃣ If DESCUENTO was cancelled → revert discount on HOSPEDAJE
+       */
+      const shouldRevertDiscount =
+        estatus === 'Cancelado' && updatedDoc.Forma_de_Pago === 'Descuento';
+
+      if (shouldRevertDiscount) {
+        console.log('↩️ Reverting Descuento_Aplicado on HOSPEDAJE');
+
+        const hospedajes = await this.accountingModel.find({
+          hotel,
+          Folio: updatedDoc.Folio,
+          Descripcion: 'HOSPEDAJE',
+          Descuento_Aplicado: true,
+        });
+
+        console.log('🏨 Hospedajes found:', hospedajes.length);
+
+        if (hospedajes.length) {
+          const ids = hospedajes.map((h) => h._id);
+
+          const res = await this.accountingModel.updateMany(
+            { _id: { $in: ids } },
+            {
+              $set: {
+                Descuento_Aplicado: false,
+                ID_Pago: '',
+              },
+            },
+          );
+
+          console.log('🧾 Hospedajes updated:', res.modifiedCount);
+        }
       }
+
+      /**
+       * 3️⃣ Notify listeners
+       */
       this.broadcast(updatedDoc);
+      console.log('📡 broadcast sent');
 
+      console.log('--- updatePaymentStatus END ---');
       return updatedDoc;
     } catch (err) {
-      console.error('Error al actualizar pago:', err);
+      console.error('🔥 Error updating payment status:', err);
       throw err;
     }
   }
