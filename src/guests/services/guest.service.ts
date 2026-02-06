@@ -116,34 +116,26 @@ export class GuestService {
   }
 
   async onReservationResize(hotel: string, data: any): Promise<huespeds[]> {
-    return this.guestModel
-      .findOneAndUpdate(
-        { folio: data.data.folio, hotel: hotel },
-        {
-          $set: {
-            llegada: data.data.StartTime,
-            salida: data.data.EndTime,
-            noches: data.data.stayNights,
-            tarifa: data.data.tarifaSeleccionada[0],
-            porPagar: data.data.totalSeleccionado,
-            pendiente: data.data.totalSeleccionado,
-            habitacion: data.data.cuarto,
-            numeroCuarto: data.data.numeroCuarto,
-            desgloseEdoCuenta: data.data.desgloseEdoCuenta,
-          },
-        },
-      )
-      .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
-      })
-      .catch((err) => {
-        return err;
-      });
+    const resizeData = data.data;
+
+    // Adapt resize payload to onModificaHuesped format
+    const huespedModificado = {
+      folio: resizeData.folio,
+      llegada: resizeData.StartTime,
+      salida: resizeData.EndTime,
+      noches: resizeData.stayNights,
+      tarifa: resizeData.tarifaSeleccionada?.[0],
+      porPagar: resizeData.totalSeleccionado,
+      pendiente: resizeData.totalSeleccionado,
+      habitacion: resizeData.cuarto,
+      numeroCuarto: resizeData.numeroCuarto,
+      desgloseEdoCuenta: resizeData.desgloseEdoCuenta,
+    };
+
+    // Reuse the FULL logic (lateCheckOut included)
+    return this.onModificaHuesped(hotel, {
+      data: [huespedModificado],
+    });
   }
 
   async onModificaHuesped(hotel: string, data: any): Promise<huespeds[]> {
