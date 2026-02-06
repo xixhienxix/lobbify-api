@@ -213,28 +213,30 @@ export class AccountingService {
       );
 
       /**
-       * 2️⃣ If DESCUENTO was cancelled → revert discount on HOSPEDAJE
+       * 2️⃣ If DESCUENTO was cancelled → revert discount on ALL related cargos
        */
       const shouldRevertDiscount =
-        estatus === 'Cancelado' && updatedDoc.Forma_de_Pago === 'Descuento';
+        estatus === 'Cancelado' &&
+        updatedDoc.Forma_de_Pago === 'Descuento' &&
+        Array.isArray(updatedDoc.RelatedCuentas) &&
+        updatedDoc.RelatedCuentas.length > 0;
 
       if (shouldRevertDiscount) {
-        console.log('↩️ Reverting Descuento_Aplicado on HOSPEDAJE');
+        const relatedIds = updatedDoc.RelatedCuentas.map(
+          (c: any) => c?._id,
+        ).filter(Boolean);
 
-        const hospedajes = await this.accountingModel.find({
-          hotel,
-          Folio: updatedDoc.Folio,
-          Descripcion: 'HOSPEDAJE',
-          Descuento_Aplicado: true,
-        });
+        console.log(
+          '↩️ Reverting Descuento_Aplicado on related cargos:',
+          relatedIds,
+        );
 
-        console.log('🏨 Hospedajes found:', hospedajes.length);
-
-        if (hospedajes.length) {
-          const ids = hospedajes.map((h) => h._id);
-
+        if (relatedIds.length) {
           const res = await this.accountingModel.updateMany(
-            { _id: { $in: ids } },
+            {
+              _id: { $in: relatedIds },
+              hotel,
+            },
             {
               $set: {
                 Descuento_Aplicado: false,
@@ -243,7 +245,7 @@ export class AccountingService {
             },
           );
 
-          console.log('🧾 Hospedajes updated:', res.modifiedCount);
+          console.log('🧾 Related cargos updated:', res.modifiedCount);
         }
       }
 
