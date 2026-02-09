@@ -76,31 +76,131 @@ export class AccountingService {
     hotel: string,
     body: any,
   ): Promise<{ message: string; data: Edo_Cuenta }> {
+    console.log('--- addPayment START ---');
+    console.log('body....', body);
+
     body.edoCuenta.hotel = hotel;
 
     try {
-      // Create the main Edo_Cuenta entry
-      const newEntry = await this.accountingModel.create(body.edoCuenta);
+      const edoCuenta = body.edoCuenta;
+      const isDescuento = edoCuenta.Forma_de_Pago === 'Descuento';
 
-      // If creation succeeds, update all related cuentas with same ID_Pago
-      if (body.edoCuenta.RelatedCuentas?.length > 0) {
-        await Promise.all(
-          body.edoCuenta.RelatedCuentas.map((rel: { _id: string }) =>
-            this.accountingModel.updateOne(
-              { _id: rel._id },
-              { $set: { ID_Pago: newEntry.ID_Pago } },
-            ),
-          ),
+      /**
+       * ============================
+       * 🏷️ DESCUENTO FLOW
+       * ============================
+       */
+      if (isDescuento) {
+        console.log('🏷️ Processing DESCUENTO');
+
+        // ❌ Descuento NEVER has ID_Pago
+        delete edoCuenta.ID_Pago;
+
+        if (
+          !Array.isArray(edoCuenta.RelatedCuentas) ||
+          edoCuenta.RelatedCuentas.length === 0
+        ) {
+          throw new Error('Descuento must have RelatedCuentas');
+        }
+
+        const relatedIds = edoCuenta.RelatedCuentas.map(
+          (r: any) => r?._id,
+        ).filter(Boolean);
+
+        if (!relatedIds.length) {
+          throw new Error('Invalid RelatedCuentas for Descuento');
+        }
+
+        // ✅ Mark cargos as discounted
+        await this.accountingModel.updateMany(
+          {
+            _id: { $in: relatedIds },
+            hotel,
+          },
+          {
+            $set: { Descuento_Aplicado: true },
+          },
+        );
+
+        // ✅ Create descuento record
+        const descuentoEntry = await this.accountingModel.create(edoCuenta);
+
+        this.broadcast(descuentoEntry);
+
+        console.log('✅ Descuento applied');
+        console.log('--- addPayment END ---');
+
+        return {
+          message: 'Descuento aplicado',
+          data: descuentoEntry,
+        };
+      }
+
+      /**
+       * ============================
+       * 💳 PAYMENT FLOW
+       * ============================
+       */
+
+      const pagoId = this.getPagoId(edoCuenta.ID_Pago);
+
+      if (!pagoId) {
+        throw new Error('Payment must contain a valid ID_Pago');
+      }
+
+      // 🔒 Enforce single ID
+      edoCuenta.ID_Pago = [pagoId];
+
+      /**
+       * Strip ID_Pago from RelatedCuentas
+       */
+      if (Array.isArray(edoCuenta.RelatedCuentas)) {
+        edoCuenta.RelatedCuentas = edoCuenta.RelatedCuentas.map(
+          ({ ID_Pago, ...rest }) => rest,
         );
       }
+
+      console.log('💳 Final Payment ID_Pago:', edoCuenta.ID_Pago);
+
+      /**
+       * Create payment record
+       */
+      const newEntry = await this.accountingModel.create(edoCuenta);
+
+      /**
+       * Push pagoId into related cargos
+       */
+      if (edoCuenta.RelatedCuentas?.length > 0) {
+        await Promise.all(
+          edoCuenta.RelatedCuentas.map(async (rel: { _id: string }) => {
+            const result = await this.accountingModel.updateOne(
+              {
+                _id: rel._id,
+                ID_Pago: { $type: 'array' },
+              },
+              {
+                $addToSet: { ID_Pago: pagoId },
+              },
+            );
+
+            console.log(
+              `🧾 Cargo ${rel._id} — matched: ${result.matchedCount}, modified: ${result.modifiedCount}`,
+            );
+          }),
+        );
+      }
+
       this.broadcast(newEntry);
+
+      console.log('📡 Broadcast sent');
+      console.log('--- addPayment END ---');
 
       return {
         message: 'Added',
         data: newEntry,
       };
     } catch (err) {
-      console.error('Error adding payment:', err);
+      console.error('🔥 Error adding payment:', err);
       throw err;
     }
   }
@@ -179,14 +279,29 @@ export class AccountingService {
     hotel: string,
     body: any,
   ): Promise<Edo_Cuenta | null> {
+    console.log('bodyyyy', body);
+
     const { _id, estatus, fechaCancelado, autorizo } = body;
 
+    const edoCuenta = body.edoCuenta;
+    const isDescuento = edoCuenta?.Forma_de_Pago === 'Descuento';
+
+    // 🔑 Extract pagoId ONLY for payments
+    const pagoId =
+      !isDescuento &&
+      Array.isArray(edoCuenta?.ID_Pago) &&
+      edoCuenta.ID_Pago.length > 0
+        ? edoCuenta.ID_Pago[0]
+        : null;
+
     console.log('--- updatePaymentStatus START ---');
-    console.log({ hotel, _id, estatus });
+    console.log({ hotel, _id, estatus, isDescuento, pagoId });
 
     try {
       /**
-       * 1️⃣ Update main document (DESCUENTO / PAGO)
+       * ============================
+       * 1️⃣ Update main document
+       * ============================
        */
       const updatedDoc = await this.accountingModel.findOneAndUpdate(
         { _id, hotel },
@@ -195,9 +310,10 @@ export class AccountingService {
             Estatus: estatus,
             Fecha_Cancelado: fechaCancelado,
             Autorizo: autorizo,
-            ID_Pago: '',
-            Descuento_Aplicado: false,
           },
+          ...(pagoId && {
+            $pull: { ID_Pago: pagoId },
+          }),
         },
         { new: true },
       );
@@ -213,23 +329,40 @@ export class AccountingService {
       );
 
       /**
-       * 2️⃣ If DESCUENTO was cancelled → revert discount on ALL related cargos
+       * ============================
+       * 2️⃣ CANCEL PAYMENT → remove ID_Pago from cargos
+       * ============================
        */
-      const shouldRevertDiscount =
-        estatus === 'Cancelado' &&
-        updatedDoc.Forma_de_Pago === 'Descuento' &&
-        Array.isArray(updatedDoc.RelatedCuentas) &&
-        updatedDoc.RelatedCuentas.length > 0;
+      if (!isDescuento && pagoId) {
+        await this.accountingModel.updateMany(
+          {
+            hotel,
+            ID_Pago: { $type: 'array' },
+          },
+          {
+            $pull: { ID_Pago: pagoId },
+          },
+        );
 
-      if (shouldRevertDiscount) {
+        console.log('🧹 ID_Pago removed from cargos');
+      }
+
+      /**
+       * ============================
+       * 3️⃣ CANCEL DESCUENTO → revert cargos
+       * ============================
+       */
+      if (
+        isDescuento &&
+        estatus === 'Cancelado' &&
+        Array.isArray(updatedDoc.RelatedCuentas) &&
+        updatedDoc.RelatedCuentas.length > 0
+      ) {
         const relatedIds = updatedDoc.RelatedCuentas.map(
           (c: any) => c?._id,
         ).filter(Boolean);
 
-        console.log(
-          '↩️ Reverting Descuento_Aplicado on related cargos:',
-          relatedIds,
-        );
+        console.log('↩️ Reverting Descuento_Aplicado on cargos:', relatedIds);
 
         if (relatedIds.length) {
           const res = await this.accountingModel.updateMany(
@@ -238,24 +371,23 @@ export class AccountingService {
               hotel,
             },
             {
-              $set: {
-                Descuento_Aplicado: false,
-                ID_Pago: '',
-              },
+              $set: { Descuento_Aplicado: false },
             },
           );
 
-          console.log('🧾 Related cargos updated:', res.modifiedCount);
+          console.log('🧾 Cargos reverted:', res.modifiedCount);
         }
       }
 
       /**
-       * 3️⃣ Notify listeners
+       * ============================
+       * 4️⃣ Notify listeners
+       * ============================
        */
       this.broadcast(updatedDoc);
       console.log('📡 broadcast sent');
-
       console.log('--- updatePaymentStatus END ---');
+
       return updatedDoc;
     } catch (err) {
       console.error('🔥 Error updating payment status:', err);
@@ -379,5 +511,16 @@ export class AccountingService {
       const abono = item?.Abono ?? 0; // Default to 0 if Abono is undefined
       return acc + cargo - abono; // Accumulate the result
     }, 0); // Initial value is 0
+  }
+
+  private getPagoId(idPago: any): string | null {
+    if (!Array.isArray(idPago)) return null;
+
+    const validIds = idPago.filter(
+      (id) => typeof id === 'string' && id.trim().length > 0,
+    );
+
+    // Payment MUST have exactly one logical ID
+    return validIds.length > 0 ? validIds[validIds.length - 1] : null;
   }
 }
