@@ -93,7 +93,7 @@ export class AccountingService {
       if (isDescuento) {
         console.log('🏷️ Processing DESCUENTO');
 
-        // ❌ Descuento NEVER has ID_Pago
+        // Descuento NEVER has ID_Pago
         delete edoCuenta.ID_Pago;
 
         if (
@@ -111,7 +111,7 @@ export class AccountingService {
           throw new Error('Invalid RelatedCuentas for Descuento');
         }
 
-        // ✅ Mark cargos as discounted
+        //  Mark cargos as discounted
         await this.accountingModel.updateMany(
           {
             _id: { $in: relatedIds },
@@ -122,7 +122,7 @@ export class AccountingService {
           },
         );
 
-        // ✅ Create descuento record
+        // Create descuento record
         const descuentoEntry = await this.accountingModel.create(edoCuenta);
 
         this.broadcast(descuentoEntry);
@@ -133,6 +133,32 @@ export class AccountingService {
         return {
           message: 'Descuento aplicado',
           data: descuentoEntry,
+        };
+      }
+
+      /**
+       * ============================
+       * 🧾 CARGO FLOW
+       * ============================
+       */
+      const isCargo = edoCuenta.Abono === 0 && edoCuenta.Cargo !== 0;
+
+      if (isCargo) {
+        console.log('🧾 Processing CARGO');
+
+        // Cargos must NOT care about ID_Pago
+        delete edoCuenta.ID_Pago;
+
+        const cargoEntry = await this.accountingModel.create(edoCuenta);
+
+        this.broadcast(cargoEntry);
+
+        console.log('✅ Cargo created');
+        console.log('--- addPayment END ---');
+
+        return {
+          message: 'Cargo creado',
+          data: cargoEntry,
         };
       }
 
