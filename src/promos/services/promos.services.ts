@@ -35,27 +35,12 @@ export class PromosService {
         );
       }
 
-      const { codigo } = body.data; // Extract codigo from request data
+      const { codigo } = body.data;
 
-      // Check if a promo with the same codigo already exists
-      const existingPromo = await this.promosModel
-        .findOne({ codigo, hotel })
-        .exec();
-
-      if (existingPromo) {
-        return {
-          success: false,
-          message: `La Promoción con el codigo:  '${codigo}' ya existe, utilize un codigo diferente.`,
-          exist: true,
-        };
-      }
-
-      // Function to safely convert date strings using Luxon
       const parseDate = (dateString: string) => {
         return dateString ? DateTime.fromISO(dateString).toJSDate() : null;
       };
 
-      // Convert string dates to Date objects using Luxon
       const data = {
         ...body.data,
         hotel,
@@ -65,23 +50,50 @@ export class PromosService {
         endDateFC: parseDate(body.data.endDateFC),
       };
 
-      const createdData = await this.promosModel.create(data);
+      // Remove codigo from the update payload — never overwrite it
+      const { codigo: _omit, ...updateData } = data;
 
-      // Emitimos el evento para notificar a los clientes conectados
+      const existingPromo = await this.promosModel
+        .findOne({ codigo, hotel })
+        .exec();
+
+      if (existingPromo) {
+        // Promo exists — update everything except codigo
+        const updated = await this.promosModel
+          .findOneAndUpdate(
+            { codigo, hotel }, // find by these
+            { $set: updateData }, // update everything else
+            { new: true }, // return updated document
+          )
+          .exec();
+
+        this.promosGateway.broadcastPromosUpdate();
+
+        return {
+          success: true,
+          message: 'Promos updated successfully',
+          data: updated,
+          updated: true, // frontend can differentiate create vs update if needed
+        };
+      }
+
+      // Promo doesn't exist — create it
+      const createdData = await this.promosModel.create(data);
       this.promosGateway.broadcastPromosUpdate();
 
       return {
         success: true,
         message: 'Promos created successfully',
         data: createdData,
+        updated: false,
       };
     } catch (error) {
-      console.error('Error creating promos:', error.message);
-
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error creating promos:', message);
       return {
         success: false,
         message: 'Failed to create promos',
-        error: error.message,
+        error: message,
       };
     }
   }
