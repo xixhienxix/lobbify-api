@@ -78,6 +78,8 @@ export class huespeds {
   desgloseEdoCuenta: any;
   @Prop({ default: false }) // ← Add default value
   lateCheckOut: string;
+  @Prop({ required: false })
+  promoCode?: string;
 }
 
 export const GuestSchema = SchemaFactory.createForClass(huespeds);

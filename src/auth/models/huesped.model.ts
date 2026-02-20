@@ -77,6 +77,8 @@ export class huesped {
   desgloseEdoCuenta: any;
   @Prop()
   lateCheckOut: string;
+  @Prop({ required: false })
+  promoCode?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(huesped);

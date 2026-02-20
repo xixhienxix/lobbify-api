@@ -481,6 +481,7 @@ export class GuestService {
 
   async postReservation(hotel: string, body: any): Promise<any> {
     const huespedArr = body.huespedInfo;
+    console.log('huespedArr', huespedArr);
     const addedDocuments: any[] = [];
 
     if (!huespedArr || huespedArr.length === 0) {
