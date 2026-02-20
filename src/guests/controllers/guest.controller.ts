@@ -36,6 +36,17 @@ export class GuestsController {
     return this._GuestService.findByDateRange(hotel, start, end);
   }
 
+  @Get('/huesped/search/:folio')
+  @UseGuards(RolesUserGuard)
+  async findByFolio(
+    @Req() request: Request,
+    @Param('folio') folio,
+  ): Promise<any> {
+    const hotel = request.headers['hotel'];
+
+    return this._GuestService.findByFolio(hotel, folio);
+  }
+
   @Get('/huesped/filteredRsv')
   @UseGuards(RolesUserGuard)
   async searchRsv(

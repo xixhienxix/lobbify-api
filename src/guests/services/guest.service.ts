@@ -56,6 +56,18 @@ export class GuestService {
       });
   }
 
+  async findByFolio(hotel: string, folio: string) {
+    try {
+      // 1. Use .lean() for faster, read-only JSON objects
+      // 2. Use findOne() if folio is unique (usually is)
+      return await this.guestModel.findOne({ hotel, folio }).lean().exec();
+    } catch (err) {
+      // 3. Proper error handling
+      console.error(`Error fetching folio ${folio}:`, err);
+      throw err;
+    }
+  }
+
   async findByDateRange(
     hotel: string,
     startDate: string,
@@ -821,7 +833,7 @@ export class GuestService {
       hotel,
     };
 
-    // ✅ Dynamically build the $match filter only with defined params
+    // Dynamically build the $match filter only with defined params
     if (estatus) matchStage.estatus = estatus;
     if (habitacion) matchStage.tipoHab = habitacion;
     if (amaDesc) matchStage['housekeeping.Descripcion'] = amaDesc;
@@ -833,7 +845,7 @@ export class GuestService {
 
     console.log('matchStage:', matchStage);
 
-    // 🧩 Build the pipeline dynamically
+    // Build the pipeline dynamically
     const pipeline: any[] = [
       {
         $lookup: {
