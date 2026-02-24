@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { RolesUserGuard } from 'src/guards/roles.user.guard';
 import { CodesService } from '../_services/codes.service';
-import { code, CreateCodeDto } from '../_models/codes.model';
+import { CreateCodeDto } from '../_models/codes.model';
 
 @Controller()
 export class CodesController {

@@ -1,12 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import {
-  FilterReservationsDto,
-  HuespedDetails,
-  Promesas,
-  huespeds,
-} from '../models/guest.model';
+import { HuespedDetails, Promesas, huespeds } from '../models/guest.model';
 import { estatus, Foliador } from 'src/codes/_models/codes.model';
 import { Bloqueos } from 'src/bloqueos/_models/bloqueos.model';
 import { DateTime } from 'luxon';
@@ -87,6 +82,16 @@ export class GuestService {
       llegada: { $lte: end },
       salida: { $gte: start },
     });
+  }
+
+  async roomUpdate(hotel: string, body: any): Promise<any> {
+    return this.guestModel
+      .findOneAndUpdate(
+        { folio: body.folio, hotel },
+        { $set: { numeroCuarto: body.numeroCuarto } },
+        { new: true },
+      )
+      .catch((err) => err);
   }
 
   async findbyCode(hotel: string, code: string): Promise<huespeds[]> {

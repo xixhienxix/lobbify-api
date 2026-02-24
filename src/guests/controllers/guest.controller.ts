@@ -91,6 +91,13 @@ export class GuestsController {
 
   @Post('/reportes/actualiza/huesped')
   @UseGuards(RolesUserGuard)
+  async assignRoom(@Body() body, @Req() request: Request) {
+    const hotel = request.headers['hotel'];
+    return this._GuestService.roomUpdate(hotel, body);
+  }
+
+  @Post('/reservaciones/asignar-cuarto')
+  @UseGuards(RolesUserGuard)
   async updateHuesped(@Body() body, @Req() request: Request) {
     const hotel = request.headers['hotel'];
     return this._GuestService.updateHuesped(hotel, body);

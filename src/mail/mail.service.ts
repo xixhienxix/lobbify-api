@@ -2,7 +2,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { EmailModel } from './email.model';
 import { ConfigService } from '@nestjs/config';
-
+import { DateTime } from 'luxon';
 @Injectable()
 export class MailService {
   private transporter;
@@ -21,31 +21,32 @@ export class MailService {
     const { to, subject, reservationCode, nombre, folio, llegada, salida } =
       payload;
 
-    // Use the from address from env, do not trust frontend for 'from'
     const from = this.configService.get<string>('EMAIL_FROM');
 
-    const html = `
-      <h2>Hola ${nombre},</h2>
-      <p>Gracias por tu preferencia.</p>
-      <p>Tus reservaciones cuentan con los siguientes folios: ${folio}.</p>
-      <p>Tienes una fecha de llegada del: ${llegada}.</p>
-      <p>y una fecha de salida de: ${salida}.</p>
-      <p>Tu código de reservación es: <strong>${reservationCode}</strong></p>
-    `;
-
-    const mailOptions = {
-      from,
-      to,
-      subject,
-      html,
+    // ── Format dates in Spanish ──
+    const formatDate = (isoString: string): string => {
+      return DateTime.fromISO(isoString)
+        .setLocale('es')
+        .toFormat('dd MMMM yyyy');
     };
+
+    const llegadaFormatted = formatDate(llegada); // → "21 febrero 2026"
+    const salidaFormatted = formatDate(salida); // → "23 febrero 2026"
+
+    const html = `
+    <h2>Hola ${nombre},</h2>
+    <p>Gracias por tu preferencia.</p>
+    <p>Tus reservaciones cuentan con los siguientes folios: <strong>${folio}</strong>.</p>
+    <p>Fecha de llegada: <strong>${llegadaFormatted}</strong>.</p>
+    <p>Fecha de salida: <strong>${salidaFormatted}</strong>.</p>
+    <p>Tu código de reservación es: <strong>${reservationCode}</strong></p>
+  `;
+
+    const mailOptions = { from, to, subject, html };
 
     try {
       const info = await this.transporter.sendMail(mailOptions);
-      return {
-        message: 'Email sent successfully',
-        messageId: info.messageId,
-      };
+      return { message: 'Email sent successfully', messageId: info.messageId };
     } catch (error) {
       console.error('Error sending email:', error);
       throw new HttpException(

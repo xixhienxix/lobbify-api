@@ -27,6 +27,7 @@ import { PackagesModule } from './paquetes/paquetes.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { RoleFieldFilterInterceptor } from './interceptors/role-file-filter-interceptor';
+import { BookingParametrosModule } from './booking/parametros.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -48,6 +49,7 @@ import { RoleFieldFilterInterceptor } from './interceptors/role-file-filter-inte
     LogModule,
     PromosModule,
     AccountingModule,
+    BookingParametrosModule,
     MongooseModule.forRoot(environment.MONGODB_CONNECTION_URL, {
       connectionFactory: (connection) => {
         connection.on('connected', () => {
