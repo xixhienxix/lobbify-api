@@ -7,11 +7,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-@WebSocketGateway({
-  cors: {
-    origin: ['https://lobify-front.web.app', 'http://localhost:4200'],
-  },
-})
+@WebSocketGateway({})
 export class AccountingGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {

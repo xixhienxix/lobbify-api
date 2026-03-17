@@ -11,6 +11,15 @@ export class ParametrosService {
   ) {}
 
   async getAll(hotel: string): Promise<Parameters> {
+    console.log(
+      '🔍 hotel received:',
+      JSON.stringify(hotel),
+      'type:',
+      typeof hotel,
+      'length:',
+      hotel?.length,
+    );
+
     const query = { hotel: hotel };
 
     const result = await this.parametersModel.findOne(query).catch((err) => {
