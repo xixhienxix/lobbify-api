@@ -1,47 +1,25 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Parameters, ParametersDocument } from '../_models/parameters.model';
-import { Model } from 'mongoose';
+import { Injectable, Scope, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { Connection, Model } from 'mongoose';
+import { Parameters, ParametersSchema } from '../_models/parameters.model';
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class ParametrosService {
-  constructor(
-    @InjectModel(Parameters.name)
-    private readonly parametersModel: Model<ParametersDocument>,
-  ) {}
+  private parametersModel: Model<Parameters>;
 
-  async getAll(hotel: string): Promise<Parameters> {
-    console.log(
-      '🔍 hotel received:',
-      JSON.stringify(hotel),
-      'type:',
-      typeof hotel,
-      'length:',
-      hotel?.length,
-    );
+  constructor(@Inject(REQUEST) private readonly request: Request) {
+    const connection: Connection = (request as any).dbConnection;
+    this.parametersModel =
+      connection.models['Booking_Parameters'] ||
+      connection.model('Booking_Parameters', ParametersSchema);
+  }
 
-    const query = { hotel: hotel };
-
-    const result = await this.parametersModel.findOne(query).catch((err) => {
+  async getAll(): Promise<Parameters> {
+    const result = await this.parametersModel.findOne().catch((err) => {
       console.error('❌ [ParametersService] DB error:', err);
       throw err;
     });
-
-    if (!result) {
-      // Check what IS in the collection to compare
-      const allDocs = await this.parametersModel
-        .find({})
-        .select('hotel')
-        .lean();
-      console.log(
-        '⚠️  No match found. All hotel values in DB:',
-        allDocs.map((d) => ({
-          hotel: d['hotel'],
-          type: typeof d['hotel'],
-          length: d['hotel']?.length,
-        })),
-      );
-    }
 
     return result;
   }

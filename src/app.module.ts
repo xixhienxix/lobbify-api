@@ -2,8 +2,6 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { MongooseModule } from '@nestjs/mongoose';
-import { environment } from './environments/environment';
 import { RequestMiddleWare } from './auth/middleware/request-middleware';
 import { HuespedController } from './auth/controllers/huesped.controller';
 import { RoomsModule } from './rooms/rooms.module';
@@ -28,6 +26,9 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { RoleFieldFilterInterceptor } from './interceptors/role-file-filter-interceptor';
 import { BookingParametrosModule } from './booking/parametros.module';
+import { TenantModule } from './tenant/tenant.module';
+import { TenantMiddleware } from './tenant/tenant.middleware';
+import { AdminModule } from './admin/admin.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -50,23 +51,8 @@ import { BookingParametrosModule } from './booking/parametros.module';
     PromosModule,
     AccountingModule,
     BookingParametrosModule,
-    MongooseModule.forRoot(environment.MONGODB_CONNECTION_URL, {
-      connectionFactory: (connection) => {
-        connection.on('connected', () => {
-          console.log('✅ Connected to MongoDB');
-        });
-        connection.on('error', (error) => {
-          console.error('❌ MongoDB connection error:', error);
-        });
-        connection.on('disconnected', () => {
-          console.warn('⚠️ MongoDB connection disconnected');
-        });
-        return connection;
-      },
-      // MongoDB options
-      retryAttempts: 10, // Retry 10 times
-      retryDelay: 5000, // Retry every 5 seconds
-    }),
+    TenantModule,
+    AdminModule,
   ],
   controllers: [AppController, MailController],
   providers: [
@@ -81,5 +67,6 @@ import { BookingParametrosModule } from './booking/parametros.module';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer.apply(RequestMiddleWare).forRoutes(HuespedController);
+    consumer.apply(TenantMiddleware).forRoutes('*');
   }
 }

@@ -1,20 +1,25 @@
-import { Injectable } from '@nestjs/common';
-import { Log } from '../models/log.model';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Injectable, Scope, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { Connection, Model } from 'mongoose';
+import { Log, LogSchema } from '../models/log.model';
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class LogService {
-  constructor(@InjectModel('Log') private logModel: Model<Log>) {}
+  private logModel: Model<Log>;
 
-  async getLogsByUser(hotel: string, username: string) {
+  constructor(@Inject(REQUEST) private readonly request: Request) {
+    const connection: Connection = (request as any).dbConnection;
+    this.logModel =
+      connection.models['Logs'] || connection.model('Logs', LogSchema);
+  }
+
+  async getLogsByUser(username: string) {
     try {
       return this.logModel
-        .find({ hotel: hotel, username })
+        .find({ username })
         .then((data) => {
-          if (!data) {
-            return [];
-          }
+          if (!data) return [];
           return data;
         })
         .catch((err) => {
@@ -27,8 +32,7 @@ export class LogService {
     }
   }
 
-  async postLogs(hotel: string, body: any) {
-    body.logEntry.hotel = hotel;
+  async postLogs(body: any) {
     try {
       const data = await this.logModel.create(body.logEntry);
       return data;

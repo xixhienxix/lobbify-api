@@ -42,9 +42,9 @@ export class RolesUserGuard implements CanActivate {
     if (!authJwtToken) throw new UnauthorizedException();
 
     try {
-      const decoded = jwtDecode(authJwtToken) as TokenPayload;
+      const decoded = jwtDecode(authJwtToken) as any;
       const role = decoded?.usuariosResultQuery?.rol;
-      return role === 'ADMIN' || role === 'USER';
+      return role === 1 || role === 2;
     } catch {
       throw new UnauthorizedException();
     }

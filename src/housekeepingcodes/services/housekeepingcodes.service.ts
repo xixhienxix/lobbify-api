@@ -1,48 +1,52 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { HouseKeeping } from '../models/housekeeping.model';
-import { room } from 'src/rooms/models/rooms.model';
+import { Injectable, Scope, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { Connection, Model } from 'mongoose';
+import { HouseKeeping, HouseKeepingSchema } from '../models/housekeeping.model';
+import { room, RoomsSchema } from 'src/rooms/models/rooms.model';
 import { HousekeepingGateway } from '../gateway/housekeeping.gateway';
-@Injectable()
-export class HouseKeepingService {
-  constructor(
-    @InjectModel(HouseKeeping.name)
-    private houseKeepingModel: Model<HouseKeeping>,
-    private housekeepingGateway: HousekeepingGateway,
-    @InjectModel(room.name) private readonly roomsModel: Model<room>,
-  ) {}
 
-  async findAll(hotel: string): Promise<HouseKeeping[]> {
-    return this.houseKeepingModel
-      .find({ hotel: hotel })
-      .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
-      })
-      .catch((err) => {
-        return err;
-      });
+@Injectable({ scope: Scope.REQUEST })
+export class HouseKeepingService {
+  private houseKeepingModel: Model<HouseKeeping>;
+  private roomsModel: Model<room>;
+
+  constructor(
+    private housekeepingGateway: HousekeepingGateway,
+    @Inject(REQUEST) private readonly request: Request,
+  ) {
+    const connection: Connection = (request as any).dbConnection;
+
+    this.houseKeepingModel =
+      connection.models['Ama_De_Llaves'] ||
+      connection.model('Ama_De_Llaves', HouseKeepingSchema);
+
+    this.roomsModel =
+      connection.models['Habitaciones'] ||
+      connection.model('Habitaciones', RoomsSchema);
   }
 
-  async updateEstatus(hotel: string, body: any) {
+  async findAll(): Promise<HouseKeeping[]> {
+    return this.houseKeepingModel
+      .find()
+      .then((data) => {
+        if (!data) return;
+        return data;
+      })
+      .catch((err) => err);
+  }
+
+  async updateEstatus(body: any) {
     return this.roomsModel
       .findOneAndUpdate(
-        { hotel: hotel, Numero: body.cuarto },
+        { Numero: body.cuarto },
         { $set: { Estatus: body.estatus } },
         { new: true },
       )
       .then((updatedRoom) => {
         if (!updatedRoom) return null;
-
-        // ✅ Broadcast the updated room via WebSocket
         this.housekeepingGateway.broadcastHousekeepingUpdate(updatedRoom);
-
-        return updatedRoom; // ✅ API returns updated record too
+        return updatedRoom;
       })
       .catch((err) => {
         console.log(err);

@@ -1,50 +1,41 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import mongoose, { Model } from 'mongoose';
-import { Promesas } from '../models/promesas.model';
+import { Injectable, Scope, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { Connection, Model } from 'mongoose';
+import { Promesas, PromesasSchema } from '../models/promesas.model';
 import { PromesasGateWay } from '../gateway/promesas.gateway';
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class PromesasService {
+  private promesasModel: Model<Promesas>;
+
   constructor(
     private readonly promesasGateway: PromesasGateWay,
-    @InjectModel(Promesas.name) private promesasModel: Model<Promesas>,
-  ) {}
-
-  async getPromesa(hotel: string, body: any): Promise<Promesas[]> {
-    const folio = body.folio;
-
-    return this.promesasModel
-      .find({ Folio: folio, hotel: hotel })
-      .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
-      })
-      .catch((err) => {
-        return err;
-      });
+    @Inject(REQUEST) private readonly request: Request,
+  ) {
+    const connection: Connection = (request as any).dbConnection;
+    this.promesasModel =
+      connection.models['Promesas_Pago'] ||
+      connection.model('Promesas_Pago', PromesasSchema);
   }
 
-  async deletePromesa(hotel: string, _id: string): Promise<any> {
+  async getPromesa(body: any): Promise<Promesas[]> {
+    return this.promesasModel
+      .find({ Folio: body.folio })
+      .then((data) => {
+        if (!data) return;
+        return data;
+      })
+      .catch((err) => err);
+  }
+
+  async deletePromesa(_id: string): Promise<any> {
     try {
-      // 1. Find the document FIRST
-      const promesa = await this.promesasModel.findOne({ _id, hotel });
+      const promesa = await this.promesasModel.findOne({ _id });
+      if (!promesa) throw new Error('Promesa not found');
 
-      if (!promesa) {
-        throw new Error('Promesa not found');
-      }
-
-      // 2. Store the folio before delete
       const folio = promesa.Folio;
-
-      // 3. Now delete it
-      await this.promesasModel.deleteOne({ _id, hotel });
-
-      // 4. Broadcast using the folio
+      await this.promesasModel.deleteOne({ _id });
       this.promesasGateway.broadcastPromesasUpdate(folio);
 
       return { success: true };
@@ -53,74 +44,55 @@ export class PromesasService {
     }
   }
 
-  async promesaPago(hotel: string, body: any): Promise<Promesas[]> {
+  async promesaPago(body: any): Promise<Promesas[]> {
     const pago = {
       Folio: body.folio,
       Fecha: body.fecha,
       Cantidad: body.cantidad,
       Estatus: body.estatus,
       Aplicado: false,
-      hotel: hotel,
     };
 
     return this.promesasModel
       .create(pago)
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          this.promesasGateway.broadcastPromesasUpdate(body.folio);
-          return data;
-        }
+        if (!data) return;
+        this.promesasGateway.broadcastPromesasUpdate(body.folio);
+        return data;
       })
       .catch((err) => {
-        console.log('Post Pormesa Pago', err);
+        console.log('Post Promesa Pago', err);
         return err;
       });
   }
 
-  async updatePromesa(hotel: string, body: any): Promise<Promesas[]> {
-    const _id = body.id;
-
+  async updatePromesa(body: any): Promise<Promesas[]> {
     return this.promesasModel
       .findByIdAndUpdate(
-        { _id, hotel: hotel },
+        { _id: body.id },
         { Aplicado: true, Estatus: 'Pago Hecho' },
       )
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          this.promesasGateway.broadcastPromesasUpdate(body.Folio);
-          return data;
-        }
+        if (!data) return;
+        this.promesasGateway.broadcastPromesasUpdate(body.Folio);
+        return data;
       })
-      .catch((err) => {
-        return err;
-      });
+      .catch((err) => err);
   }
 
-  async updatePromesaEstatus(hotel: string, body: any): Promise<Promesas> {
-    const { id: _id } = body;
-
+  async updatePromesaEstatus(body: any): Promise<Promesas> {
     try {
       const updated = await this.promesasModel.findOneAndUpdate(
-        { _id, hotel },
+        { _id: body.id },
         { Estatus: body.estatus, Aplicado: true },
-        { new: true }, // 🔥 return updated doc
+        { new: true },
       );
 
-      if (!updated) {
-        return null;
-      }
+      if (!updated) return null;
 
-      // 🔥 The actual folio comes from DB, not body
       this.promesasGateway.broadcastPromesasUpdate(updated.Folio);
-
       return updated;
-    } catch (err) {
+    } catch (err: any) {
       return err;
     }
   }

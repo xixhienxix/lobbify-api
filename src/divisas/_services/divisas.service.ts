@@ -1,25 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { divisa } from '../_models/divisas.model';
+import { Connection, Model } from 'mongoose';
+import { divisa, DivisasSchema } from '../_models/divisas.model';
+import { TenantService } from 'src/tenant/tenant.service';
 
 @Injectable()
 export class DivisasService {
-  constructor(@InjectModel(divisa.name) private divModel: Model<divisa>) {}
+  constructor(private readonly tenantService: TenantService) {}
+
+  private getModel(): Model<divisa> {
+    const connection: Connection = this.tenantService.getAdminConnection();
+    return (
+      connection.models['Divisas'] || connection.model('Divisas', DivisasSchema)
+    );
+  }
 
   async findAll(): Promise<divisa[]> {
-    return this.divModel
-      .find({})
+    return this.getModel()
+      .find()
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+        if (!data) return;
+        return data;
       })
-      .catch((err) => {
-        return err;
-      });
+      .catch((err) => err);
   }
 }

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -7,7 +6,6 @@ import {
   Post,
   Put,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { RolesUserGuard } from 'src/guards/roles.user.guard';
@@ -19,86 +17,66 @@ export class AccountingController {
 
   @Get('/edo_cuenta/:folio')
   @UseGuards(RolesUserGuard)
-  async getAccounts(
-    @Req() request: Request,
-    @Param('folio') folio: string,
-  ): Promise<any> {
-    const hotel = request.headers['hotel'];
-    return this._AccountingService.getAccounts(hotel, folio);
+  async getAccounts(@Param('folio') folio: string): Promise<any> {
+    return this._AccountingService.getAccounts(folio);
   }
 
   @Get('/ingresos/range')
   @UseGuards(RolesUserGuard)
   async getAccountsByRange(
-    @Req() request: Request,
     @Query('start') start: string,
     @Query('end') end: string,
     @Query('folio') folio?: string,
   ): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._AccountingService.getAccountsByDateRange(
-      hotel,
-      start,
-      end,
-      folio,
-    );
+    return this._AccountingService.getAccountsByDateRange(start, end, folio);
   }
 
   @Post('/edo_cuenta/pagos')
   @UseGuards(RolesUserGuard)
-  async addHospedaje(@Body() body, @Req() request: Request) {
-    const hotel = request.headers['hotel'];
-    return this._AccountingService.addPayment(hotel, body);
+  async addHospedaje(@Body() body) {
+    return this._AccountingService.addPayment(body);
   }
 
   @Post('/edo_cuenta/descuento')
   @UseGuards(RolesUserGuard)
-  async addDscByConcept(@Body() body, @Req() request: Request) {
-    const hotel = request.headers['hotel'];
-    return this._AccountingService.addDscProperty(hotel, body);
+  async addDscByConcept(@Body() body) {
+    return this._AccountingService.addDscProperty(body);
   }
 
   @Post('/edo_cuenta/hospedaje')
   @UseGuards(RolesUserGuard)
-  async updateHuesped(@Body() body, @Req() request: Request) {
-    const hotel = request.headers['hotel'];
-    return this._AccountingService.addHospedaje(hotel, body);
+  async updateHuesped(@Body() body) {
+    return this._AccountingService.addHospedaje(body);
   }
 
   @Put('/edo_cuenta/pagos')
   @UseGuards(RolesUserGuard)
-  updatePromesa(@Req() request: Request, @Body() body) {
-    const hotel = request.headers['hotel'];
-    return this._AccountingService.updatePaymentStatus(hotel, body);
+  updatePromesa(@Body() body) {
+    return this._AccountingService.updatePaymentStatus(body);
   }
 
   @Put('/edo_cuenta/update/concepto')
   @UseGuards(RolesUserGuard)
-  updateHospedaje(@Req() request: Request, @Body() body) {
-    const hotel = request.headers['hotel'];
-    return this._AccountingService.updateHospedaje(hotel, body);
+  updateHospedaje(@Body() body) {
+    return this._AccountingService.updateHospedaje(body);
   }
 
   @Get('/ingresos/totales')
   @UseGuards(RolesUserGuard)
-  async getAllAccounts(@Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-    return this._AccountingService.getAllAccounts(hotel);
+  async getAllAccounts(): Promise<any> {
+    return this._AccountingService.getAllAccounts();
   }
 
   @Put('/edo_cuenta/alojamiento')
   @UseGuards(RolesUserGuard)
-  updateBalance(@Req() request: Request, @Body() body) {
-    const hotel = request.headers['hotel'];
-    return this._AccountingService.updateBalance(hotel, body);
+  updateBalance(@Body() body) {
+    return this._AccountingService.updateBalance(body);
   }
 
   @Post('/edo_cuenta/totales')
   @UseGuards(RolesUserGuard)
-  actualizaSaldos(@Req() request: Request, @Body() body) {
-    const hotel = request.headers['hotel'];
-    return this._AccountingService.actualizaTotales(hotel, body);
+  actualizaSaldos(@Body() body) {
+    return this._AccountingService.actualizaTotales(body);
   }
 
   ///edo_cuenta/pagos

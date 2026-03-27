@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { AdminGuard } from 'src/guards/admin.guard';
 import { UserService } from '../service/user.service';
 
@@ -8,8 +8,7 @@ export class AutorizaController {
 
   @Post('/auth/autoriza')
   @UseGuards(AdminGuard)
-  async findAlLHuespeds(@Body() body, @Req() request: Request) {
-    const hotel = request.headers['hotel'];
-    return this._userService.autoriza(hotel, body);
+  async findAlLHuespeds(@Body() body) {
+    return this._userService.autoriza(body);
   }
 }

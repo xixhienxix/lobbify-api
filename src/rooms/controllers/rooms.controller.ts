@@ -3,10 +3,8 @@ import {
   Controller,
   Delete,
   Get,
-  Param,
   Post,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { RoomsService } from '../services/rooms.service';
@@ -18,53 +16,40 @@ export class RoomsController {
 
   @Get('/habitaciones')
   @UseGuards(RolesUserGuard)
-  async findAllRooms(@Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._habitacionService.findAll(hotel);
+  async findAllRooms(): Promise<any> {
+    return this._habitacionService.findAll();
   }
 
   @Get('/habitaciones/codigos')
   @UseGuards(RolesUserGuard)
-  async findAllRoomCodes(@Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._habitacionService.findAllRoomCodes(hotel);
+  async findAllRoomCodes(): Promise<any> {
+    return this._habitacionService.findAllRoomCodes();
   }
 
   @Post('/habitacion/guardar')
   @UseGuards(RolesUserGuard)
-  async postRoom(@Body() body, @Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-    return this._habitacionService.postRoom(hotel, body);
+  async postRoom(@Body() body): Promise<any> {
+    return this._habitacionService.postRoom(body);
   }
 
   @Post('/habitaciones/agregar')
   @UseGuards(RolesUserGuard)
-  async agregarHabitaciones(
-    @Body() body,
-    @Req() request: Request,
-  ): Promise<any> {
-    const hotel = request.headers['hotel'];
-    return this._habitacionService.agregarHabitacion(hotel, body);
+  async agregarHabitaciones(@Body() body): Promise<any> {
+    return this._habitacionService.agregarHabitacion(body);
   }
 
   @Delete('/habitacion/delete')
   @UseGuards(RolesUserGuard)
   async deleteRoom(
-    @Req() request: Request,
     @Query('codigo') codigo: string,
     @Query('numero') numero: string,
   ): Promise<any> {
-    const hotel = request.headers['hotel'];
-    return this._habitacionService.deleteRoom(hotel, codigo, numero);
+    return this._habitacionService.deleteRoom(codigo, numero);
   }
 
   @Post('update/habitacion/imageurl')
   @UseGuards(RolesUserGuard)
-  async updateImgToMongo(@Body() body, @Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._habitacionService.uploadImgToMongo(hotel, body);
+  async updateImgToMongo(@Body() body): Promise<any> {
+    return this._habitacionService.uploadImgToMongo(body);
   }
 }

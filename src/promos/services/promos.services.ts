@@ -1,19 +1,25 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Promos } from '../models/promos.model';
-import { Model } from 'mongoose';
+import { Inject, Injectable, Scope } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Promos, promoSchema } from '../models/promos.model';
+import { Connection, Model } from 'mongoose';
 import { DateTime } from 'luxon';
 import { PromosGateway } from '../gateway/promos.gateway';
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class PromosService {
+  private promosModel: Model<Promos>;
+
   constructor(
     private readonly promosGateway: PromosGateway,
-    @InjectModel('Promos') private readonly promosModel: Model<Promos>,
-  ) {}
+    @Inject(REQUEST) private readonly request: Request,
+  ) {
+    const connection = (request as any).dbConnection as Connection;
+    this.promosModel =
+      connection.models['Promos'] || connection.model('Promos', promoSchema);
+  }
 
-  async findAll(hotel: string): Promise<Promos[]> {
+  async findAll(): Promise<Promos[]> {
     return this.promosModel
-      .find({ hotel: hotel })
+      .find()
       .then((data) => {
         if (!data) {
           return;
@@ -27,7 +33,7 @@ export class PromosService {
       });
   }
 
-  async createPromos(hotel: string, body: any) {
+  async createPromos(body: any) {
     try {
       if (!body || !body.data) {
         throw new Error(
@@ -43,7 +49,6 @@ export class PromosService {
 
       const data = {
         ...body.data,
-        hotel,
         intialDateFCCheckIn: parseDate(body.data.intialDateFCCheckIn),
         endDateFCCheckIn: parseDate(body.data.endDateFCCheckIn),
         intialDateFC: parseDate(body.data.intialDateFC),
@@ -53,15 +58,13 @@ export class PromosService {
       // Remove codigo from the update payload — never overwrite it
       const { codigo: _omit, ...updateData } = data;
 
-      const existingPromo = await this.promosModel
-        .findOne({ codigo, hotel })
-        .exec();
+      const existingPromo = await this.promosModel.findOne({ codigo }).exec();
 
       if (existingPromo) {
         // Promo exists — update everything except codigo
         const updated = await this.promosModel
           .findOneAndUpdate(
-            { codigo, hotel }, // find by these
+            { codigo }, // find by these
             { $set: updateData }, // update everything else
             { new: true }, // return updated document
           )

@@ -40,8 +40,8 @@ export class AdminGuard extends AuthenticationGuard implements CanActivate {
       throw new UnauthorizedException();
     }
     try {
-      const decoded = jwtDecode(authJwtToken) as TokenPayload;
-      if (decoded.usuariosResultQuery.rol === 'ADMIN') {
+      const decoded = jwtDecode(authJwtToken) as any;
+      if (decoded.usuariosResultQuery.rol === 1) {
         return true;
       } else {
         return false;

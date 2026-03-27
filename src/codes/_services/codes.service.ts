@@ -1,105 +1,95 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Injectable, Scope, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { Connection, Model } from 'mongoose';
 import {
   Adicional,
+  AdicionalSchema,
   CreateCodeDto,
   Foliador,
+  FoliadorSchema,
   code,
+  CodesSchema,
   estatus,
+  EstatusSchema,
 } from '../_models/codes.model';
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class CodesService {
-  constructor(
-    @InjectModel(code.name) private codeModel: Model<code>,
-    @InjectModel('Estatus') private readonly estatusModel: Model<estatus>,
-    @InjectModel('Foliador') private readonly foliadorModel: Model<Foliador>,
-    @InjectModel('Adicional') private readonly adicionalModel: Model<Adicional>,
-  ) {}
+  private codeModel: Model<code>;
+  private estatusModel: Model<estatus>;
+  private foliadorModel: Model<Foliador>;
+  private adicionalModel: Model<Adicional>;
 
-  async findAll(hotel: string): Promise<code[]> {
+  constructor(@Inject(REQUEST) private readonly request: Request) {
+    const connection: Connection = (request as any).dbConnection;
+
+    this.codeModel =
+      connection.models['Codes'] || // 👈 replace 'Codes' with your actual collection name
+      connection.model('Codes', CodesSchema);
+
+    this.estatusModel =
+      connection.models['Estatus'] ||
+      connection.model('Estatus', EstatusSchema);
+
+    this.foliadorModel =
+      connection.models['Foliador'] ||
+      connection.model('Foliador', FoliadorSchema);
+
+    this.adicionalModel =
+      connection.models['Servicios_Adicionales'] ||
+      connection.model('Servicios_Adicionales', AdicionalSchema);
+  }
+
+  async findAll(): Promise<code[]> {
     return this.codeModel
-      .find({ hotel: hotel })
+      .find()
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+        if (!data) return;
+        return data;
       })
-      .catch((err) => {
-        return err;
-      });
+      .catch((err) => err);
   }
 
-  async findAllEstatus(hotel: string): Promise<estatus[]> {
+  async findAllEstatus(): Promise<estatus[]> {
     return this.estatusModel
-      .find({ hotel: hotel })
+      .find()
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+        if (!data) return;
+        return data;
       })
-      .catch((err) => {
-        return err;
-      });
+      .catch((err) => err);
   }
 
-  async findFolios(hotel: string): Promise<Foliador[]> {
+  async findFolios(): Promise<Foliador[]> {
     return this.foliadorModel
-      .find({ hotel: hotel })
+      .find()
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+        if (!data) return;
+        return data;
       })
-      .catch((err) => {
-        return err;
-      });
+      .catch((err) => err);
   }
 
-  async findAdicional(hotel: string): Promise<Foliador[]> {
+  async findAdicional(): Promise<Adicional[]> {
     return this.adicionalModel
-      .find({ hotel: hotel })
+      .find()
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+        if (!data) return;
+        return data;
       })
-      .catch((err) => {
-        return err;
-      });
+      .catch((err) => err);
   }
 
   async postNewCode(
     codigo: CreateCodeDto,
-    hotel: string,
   ): Promise<{ success: boolean; data?: code }> {
     try {
-      const codigoConHotel = { ...codigo, hotel };
-
-      const createdCode = await this.codeModel.create(codigoConHotel);
-
-      return {
-        success: true,
-        data: createdCode,
-      };
+      const createdCode = await this.codeModel.create(codigo);
+      return { success: true, data: createdCode };
     } catch (error) {
       console.error('Error inserting new code:', error);
-      return {
-        success: false,
-      };
+      return { success: false };
     }
   }
 }

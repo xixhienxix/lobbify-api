@@ -1,78 +1,69 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { room } from '../models/rooms.model';
-import { Model } from 'mongoose';
+import { Injectable, Scope, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { Connection, Model } from 'mongoose';
+import { room, RoomsSchema } from '../models/rooms.model';
+import { tarifas, TarifasSchema } from 'src/tarifas/_models/tarifas.model';
 import { GuestService } from 'src/guests/services/guest.service';
-import { tarifas } from 'src/tarifas/_models/tarifas.model';
 import { reservationStatusMap } from 'src/interfaces/reservation.status';
-@Injectable()
-export class RoomsService {
-  constructor(
-    @InjectModel(room.name) private habModel: Model<room>,
-    @InjectModel('Tarifas') private readonly tarifasModel: Model<tarifas>,
-    private _guestService: GuestService,
-  ) {}
 
-  async findAll(hotel: string): Promise<room[]> {
-    return this.habModel
-      .find({ hotel: hotel })
-      .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
-      })
-      .catch((err) => {
-        return err;
-      });
+@Injectable({ scope: Scope.REQUEST })
+export class RoomsService {
+  private habModel: Model<room>;
+  private tarifasModel: Model<tarifas>;
+
+  constructor(
+    private _guestService: GuestService,
+    @Inject(REQUEST) private readonly request: Request,
+  ) {
+    const connection: Connection = (request as any).dbConnection;
+
+    this.habModel =
+      connection.models['Habitaciones'] ||
+      connection.model('Habitaciones', RoomsSchema);
+
+    this.tarifasModel =
+      connection.models['Tarifas'] ||
+      connection.model('Tarifas', TarifasSchema);
   }
 
-  async findAllRoomCodes(hotel: string): Promise<room[]> {
+  async findAll(): Promise<room[]> {
     return this.habModel
-      .find({ hotel: hotel })
+      .find()
+      .then((data) => {
+        if (!data) return;
+        return data;
+      })
+      .catch((err) => err);
+  }
+
+  async findAllRoomCodes(): Promise<room[]> {
+    return this.habModel
+      .find()
       .distinct('Codigo')
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+        if (!data) return;
+        return data;
       })
-      .catch((err) => {
-        return err;
-      });
+      .catch((err) => err);
   }
 
-  async postRoom(hotel: string, body: any): Promise<any> {
-    const filterEdit = {
-      Codigo: body.habitacion.Codigo,
-    };
-
-    // Make sure to remove the _id from the update object before calling updateMany
+  async postRoom(body: any): Promise<any> {
+    const filterEdit = { Codigo: body.habitacion.Codigo };
     const { _id, ...update } = body.habitacion;
-
     const isEdit = body.editar === true || body.editar === 'true';
 
-    console.log('body.editar: POST', body.editar);
-    // Check if body.editar is true before proceeding with the update
     if (isEdit) {
       try {
         const result = await this.habModel.updateMany(filterEdit, update);
-        console.log('update table', result);
-        // Check if any documents were modified
         if (result.modifiedCount === 0) {
           return {
             message:
               'No documents were updated, please check your filter criteria.',
           };
         }
-
         return { message: 'Documents updated successfully' };
       } catch (err) {
-        console.log('Error during update:', err);
         return { message: 'Error during update', error: err };
       }
     } else {
@@ -104,123 +95,77 @@ export class RoomsService {
             Tarifa: body.habitacion.Tarifa,
             Amenidades: body.habitacion.Amenidades,
             Tipos_Camas: body.habitacion.Tipos_Camas,
-            hotel: hotel,
           })
           .then((data) => {
-            if (!data) {
-              response.push({
-                message:
-                  'No se pudo agregar la habitacion intente de nuevo mas tarde',
-              });
-            }
-            if (data) {
-              return { message: 'Habitaciones Dadas de Alta' };
-            }
+            if (!data)
+              response.push({ message: 'No se pudo agregar la habitacion' });
+            if (data) return { message: 'Habitaciones Dadas de Alta' };
           })
           .catch((err) => {
             errors.push(err);
             return err;
           });
       }
-      if (errors) {
-        return errors;
-      } else {
-        return response;
-      }
+
+      return errors.length > 0 ? errors : response;
     }
   }
 
-  async deleteRoom(hotel: string, codigo: any, numero: string): Promise<any> {
-    // const filter = { hotel: hotel, Codigo: codigo };
+  async deleteRoom(codigo: any, numero: string): Promise<any> {
     try {
       const today = new Date();
-      today.setUTCHours(0, 0, 0, 0); // ensures we start comparing from midnight UTC
+      today.setUTCHours(0, 0, 0, 0);
 
-      const huespeds = await this._guestService.findbyCodeAndDate(
-        hotel,
-        codigo,
-        {
-          $or: [{ llegada: { $gte: today } }, { salida: { $gte: today } }],
-        },
-      );
+      const huespeds = await this._guestService.findbyCodeAndDate(codigo, {
+        $or: [{ llegada: { $gte: today } }, { salida: { $gte: today } }],
+      });
 
-      if (huespeds.length > 0) {
-        return huespeds.length;
-      }
+      if (huespeds.length > 0) return huespeds.length;
 
       const deleteFilter =
         numero === 'NN'
-          ? { Codigo: codigo, hotel }
-          : { Codigo: codigo, Numero: numero, hotel };
+          ? { Codigo: codigo }
+          : { Codigo: codigo, Numero: numero };
 
       const roomDeletion = await this.habModel.deleteMany(deleteFilter);
 
-      if (roomDeletion.deletedCount === 0) {
-        console.log('error deletion: ', roomDeletion);
-        return { message: 'Failed' };
-      }
-      // const tarifasDeletion = await this.tarifasModel.deleteMany({
-      //   Habitacion: codigo,
-      //   hotel,
-      // });
+      if (roomDeletion.deletedCount === 0) return { message: 'Failed' };
 
       return roomDeletion ? { message: 'Success' } : { message: 'Failed' };
-    } catch (error) {
+    } catch (error: any) {
       return { error: error.message || 'An error occurred' };
     }
   }
 
-  async uploadImgToMongo(hotel: string, body: any): Promise<room[]> {
+  async uploadImgToMongo(body: any): Promise<room[]> {
     const codigoCuarto = body.fileUploadName.split('.')[0];
 
     return this.habModel
-      .updateMany(
-        { Codigo: codigoCuarto, hotel: hotel },
-        { $set: { URL: body.downloadURL } },
-      )
+      .updateMany({ Codigo: codigoCuarto }, { $set: { URL: body.downloadURL } })
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+        if (!data) return;
+        return data;
       })
-      .catch((err) => {
-        return err;
-      });
+      .catch((err) => err);
   }
 
-  async agregarHabitacion(hotel: string, body: any): Promise<any> {
+  async agregarHabitacion(body: any): Promise<any> {
     const codigo = body.codigoCuarto;
     const habs = body.habitacionesArr;
 
     const habData = await this.habModel.find({ Codigo: codigo }).exec();
 
-    if (habData.length === 0) {
-      return 'Habitacion not found'; // If habData does not exist, throw an error
-    }
+    if (habData.length === 0) return 'Habitacion not found';
 
-    // Destructure _id from habData and get the remaining properties for updating
-    const { _id, ...updateData } = habData[0].toObject(); // Convert Mongoose object to plain object
+    const { _id, ...updateData } = habData[0].toObject();
 
-    // Loop through habitacionesArr
     const roomPromises = habs.map(async (hab: any) => {
-      const newRoom = {
-        ...updateData, // Spread the properties from the first habData object (without _id)
-        Numero: hab, // Replace the Numero with the value from the current item in habs
-      };
-
-      // Add the new room object to the database
+      const newRoom = { ...updateData, Numero: hab };
       const addedRoom = new this.habModel(newRoom);
-      await addedRoom.save(); // Save the new room to the database
-
-      return addedRoom; // Optionally, return the added room for further use
+      await addedRoom.save();
+      return addedRoom;
     });
 
-    // Wait for all rooms to be added to the database
-    const addedRooms = await Promise.all(roomPromises);
-
-    return addedRooms; // Return the array of added rooms
+    return Promise.all(roomPromises);
   }
 }

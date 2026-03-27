@@ -81,4 +81,4 @@ export class huesped {
   promoCode?: string;
 }
 
-export const UserSchema = SchemaFactory.createForClass(huesped);
+export const HuespedSchema = SchemaFactory.createForClass(huesped);

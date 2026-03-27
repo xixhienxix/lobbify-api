@@ -1,15 +1,12 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Param,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { PaquetesServices } from '../services/paquetes.services';
 import { RolesUserGuard } from 'src/guards/roles.user.guard';
 
@@ -19,27 +16,14 @@ export class PaquetesController {
 
   @Get('catalogos/paquetes')
   @UseGuards(RolesUserGuard)
-  async getAllPackages(@Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    // Optional: validate hotel header presence
-    if (!hotel || Array.isArray(hotel)) {
-      throw new BadRequestException('Missing or invalid hotel header');
-    }
-
-    return this._paquetesService.getAllPackages(hotel);
+  async getAllPackages(): Promise<any> {
+    return this._paquetesService.getAllPackages();
   }
 
   @Post('catalogos/paquetes')
   @UseGuards(RolesUserGuard)
-  async postPackages(@Req() request, @Body() body) {
-    const hotel = request.headers['hotel'];
-    // Optional: validate hotel header presence
-    if (!hotel || Array.isArray(hotel)) {
-      throw new BadRequestException('Missing or invalid hotel header');
-    }
-
-    return this._paquetesService.postNewPackage(hotel, body);
+  async postPackages(@Body() body) {
+    return this._paquetesService.postNewPackage(body);
   }
 
   @Delete('catalogos/paquetes/:_id')

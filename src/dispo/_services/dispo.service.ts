@@ -1,13 +1,19 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { disponibilidad } from '../_models/dispo.model';
-import { Model } from 'mongoose';
+import { Injectable, Scope, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { Connection, Model } from 'mongoose';
+import { disponibilidad, DisponibilidadSchema } from '../_models/dispo.model';
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class DisponibilidadService {
-  constructor(
-    @InjectModel(disponibilidad.name) private dispoModel: Model<disponibilidad>,
-  ) {}
+  private dispoModel: Model<disponibilidad>;
+
+  constructor(@Inject(REQUEST) private readonly request: Request) {
+    const connection: Connection = (request as any).dbConnection;
+    this.dispoModel =
+      connection.models['Disponibilidad'] ||
+      connection.model('Disponibilidad', DisponibilidadSchema);
+  }
 
   async postDisponibilidadBooking(body): Promise<any> {
     const llegada = new Date(body.fechaInicial);
@@ -22,19 +28,12 @@ export class DisponibilidadService {
         Salida: salida,
         Estatus_AMA: 'Limpio',
         Folio: '123123',
-        hotel: 'Hotel Pokemon ',
       })
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+        if (!data) return;
+        return data;
       })
-      .catch((err) => {
-        return err;
-      });
+      .catch((err) => err);
   }
 
   async getDisponibilidadBooking(params): Promise<disponibilidad[]> {
@@ -44,18 +43,11 @@ export class DisponibilidadService {
           $gte: new Date(params.fechaInicial),
           $lt: new Date(params.fechaFinal),
         },
-        hotel: params.hotel,
       })
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+        if (!data) return;
+        return data;
       })
-      .catch((err) => {
-        return err;
-      });
+      .catch((err) => err);
   }
 }

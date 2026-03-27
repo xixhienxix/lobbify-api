@@ -3,10 +3,12 @@ import * as mongoose from 'mongoose';
 
 export type UserDocument = mongoose.HydratedDocument<usuario>;
 
-@Schema()
+@Schema({ collection: 'usuarios' })
 export class usuario {
   @Prop()
   username: string;
+  @Prop()
+  password: string;
   @Prop()
   passwordHash: string;
   @Prop()
@@ -25,4 +27,4 @@ export class usuario {
   accessToken: string;
 }
 
-export const UserSchema = SchemaFactory.createForClass(usuario);
+export const UsuarioSchema = SchemaFactory.createForClass(usuario);

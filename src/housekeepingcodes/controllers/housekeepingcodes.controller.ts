@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { RolesUserGuard } from 'src/guards/roles.user.guard';
 import { HouseKeepingService } from '../services/housekeepingcodes.service';
 
@@ -8,16 +8,13 @@ export class HouseKeepingCodesController {
 
   @Get('/codigos/housekeeping')
   @UseGuards(RolesUserGuard)
-  async findAllGuests(@Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._housekeepingCodesService.findAll(hotel);
+  async findAllGuests(): Promise<any> {
+    return this._housekeepingCodesService.findAll();
   }
 
   @Post('/codigos/update/housekeeping')
   @UseGuards(RolesUserGuard)
-  async updateEstatus(@Req() request: Request, @Body() body): Promise<any> {
-    const hotel = request.headers['hotel'];
-    return this._housekeepingCodesService.updateEstatus(hotel, body);
+  async updateEstatus(@Body() body): Promise<any> {
+    return this._housekeepingCodesService.updateEstatus(body);
   }
 }

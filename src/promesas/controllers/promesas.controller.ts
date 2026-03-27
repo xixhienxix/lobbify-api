@@ -6,7 +6,6 @@ import {
   Param,
   Post,
   Put,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { PromesasService } from '../services/promesas.services';
@@ -18,42 +17,31 @@ export class PromesasController {
 
   @Get('reportes/promesas/:folio')
   @UseGuards(RolesUserGuard)
-  async findPromesasByFolio(
-    @Req() request: Request,
-    @Body() body,
-  ): Promise<any> {
-    const hotel = request.headers['hotel'];
-    return this._promesasService.getPromesa(hotel, body);
+  async findPromesasByFolio(@Body() body): Promise<any> {
+    return this._promesasService.getPromesa(body);
   }
 
   @Delete('/reportes/promesa/delete/:_id')
   @UseGuards(RolesUserGuard)
-  async deletePromesa(
-    @Req() request: Request,
-    @Param('_id') _id: string, // ✅ Correct parameter name
-  ): Promise<any> {
-    const hotel = request.headers['hotel'];
-    return this._promesasService.deletePromesa(hotel, _id);
+  async deletePromesa(@Param('_id') _id: string): Promise<any> {
+    return this._promesasService.deletePromesa(_id);
   }
 
   @Post('/reportes/promesa')
   @UseGuards(RolesUserGuard)
-  updateTarifaEspecial(@Req() request: Request, @Body() body) {
-    const hotel = request.headers['hotel'];
-    return this._promesasService.promesaPago(hotel, body);
+  updateTarifaEspecial(@Body() body) {
+    return this._promesasService.promesaPago(body);
   }
 
   @Put('/reportes/promesas/update')
   @UseGuards(RolesUserGuard)
-  updatePromesa(@Req() request: Request, @Body() body) {
-    const hotel = request.headers['hotel'];
-    return this._promesasService.updatePromesa(hotel, body);
+  updatePromesa(@Body() body) {
+    return this._promesasService.updatePromesa(body);
   }
 
   @Put('/promesas/update/estatus')
   @UseGuards(RolesUserGuard)
-  updatePromesaEstatus(@Req() request: Request, @Body() body) {
-    const hotel = request.headers['hotel'];
-    return this._promesasService.updatePromesaEstatus(hotel, body);
+  updatePromesaEstatus(@Body() body) {
+    return this._promesasService.updatePromesaEstatus(body);
   }
 }

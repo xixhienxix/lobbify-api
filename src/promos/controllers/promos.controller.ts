@@ -5,7 +5,6 @@ import {
   Get,
   Param,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { PromosService } from '../services/promos.services';
@@ -17,18 +16,14 @@ export class PromosController {
 
   @Get('/promos')
   @UseGuards(RolesUserGuard)
-  async findAllRooms(@Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._promosService.findAll(hotel);
+  async findAllRooms(): Promise<any> {
+    return this._promosService.findAll();
   }
 
   @Post('/promos')
   @UseGuards(RolesUserGuard)
-  async postPromo(@Body() body, @Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._promosService.createPromos(hotel, body);
+  async postPromo(@Body() body): Promise<any> {
+    return this._promosService.createPromos(body);
   }
 
   @Delete('/promos/:_id')

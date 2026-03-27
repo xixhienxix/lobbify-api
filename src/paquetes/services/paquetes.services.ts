@@ -1,49 +1,41 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Paquetes, PaquetesDocument } from '../models/paquetes.model';
-import { Model } from 'mongoose';
-import { Types } from 'mongoose';
+import { Injectable, Scope, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { Connection, Model, Types } from 'mongoose';
+import { Paquetes, PaquetesSchema } from '../models/paquetes.model';
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class PaquetesServices {
-  constructor(
-    @InjectModel(Paquetes.name) private paquetesModel: Model<PaquetesDocument>,
-  ) {}
+  private paquetesModel: Model<Paquetes>;
 
-  async getAllPackages(hotel: string): Promise<Paquetes[]> {
+  constructor(@Inject(REQUEST) private readonly request: Request) {
+    const connection: Connection = (request as any).dbConnection;
+    this.paquetesModel =
+      connection.models['Packages'] ||
+      connection.model('Packages', PaquetesSchema);
+  }
+
+  async getAllPackages(): Promise<Paquetes[]> {
     try {
-      const result = await this.paquetesModel.find({ hotel }).exec();
-      return result;
+      return await this.paquetesModel.find().exec();
     } catch (error) {
       throw error;
     }
   }
 
-  async postNewPackage(hotel: string, body: any) {
+  async postNewPackage(body: any) {
     try {
-      // Define your unique query criteria — e.g., match by 'Nombre' and 'hotel'
-      const query = { Nombre: body.Nombre, hotel };
-
-      // Find existing document
+      const query = { Nombre: body.Nombre };
       const existingPackage = await this.paquetesModel.findOne(query).exec();
 
       if (existingPackage) {
-        // Update existing document by its _id
-        const updated = await this.paquetesModel
-          .findByIdAndUpdate(
-            existingPackage._id,
-            { hotel, ...body },
-            { new: true },
-          )
+        return await this.paquetesModel
+          .findByIdAndUpdate(existingPackage._id, { ...body }, { new: true })
           .exec();
-        return updated;
       } else {
-        // Create new document if none found
-        const created = await this.paquetesModel.create({ hotel, ...body });
-        return created;
+        return await this.paquetesModel.create({ ...body });
       }
     } catch (err) {
-      // Handle errors
       return err;
     }
   }
@@ -59,24 +51,11 @@ export class PaquetesServices {
       throw new Error('Invalid id format');
     }
 
-    // Force convert to string, to avoid number type passed
-    idStr = idStr.toString();
-
-    const objectId = new Types.ObjectId(idStr);
-
-    console.log('_ID', objectId);
+    const objectId = new Types.ObjectId(idStr.toString());
 
     return this.paquetesModel
-      .deleteOne({
-        _id: objectId,
-      })
-      .then((data) => {
-        console.log('delete result', data);
-        return data;
-      })
-      .catch((err) => {
-        console.log(err);
-        return err;
-      });
+      .deleteOne({ _id: objectId })
+      .then((data) => data)
+      .catch((err) => err);
   }
 }

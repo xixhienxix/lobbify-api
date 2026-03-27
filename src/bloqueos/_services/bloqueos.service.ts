@@ -1,44 +1,44 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Bloqueos } from '../_models/bloqueos.model';
-@Injectable()
+import { Injectable, Scope, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { Connection, Model } from 'mongoose';
+import { Bloqueos, BloqueosSchema } from '../_models/bloqueos.model';
+
+@Injectable({ scope: Scope.REQUEST })
 export class BloqueosService {
-  constructor(
-    @InjectModel('Bloqueos') private readonly bloqueosModel: Model<Bloqueos>,
-  ) {}
-  async findAll(hotel: string): Promise<Bloqueos[]> {
-    return this.bloqueosModel
-      .find({ hotel: hotel })
-      .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
-      })
-      .catch((err) => {
-        return err;
-      });
+  private bloqueosModel: Model<Bloqueos>;
+
+  constructor(@Inject(REQUEST) private readonly request: Request) {
+    const connection: Connection = (request as any).dbConnection;
+    this.bloqueosModel =
+      connection.models['Bloqueo'] ||
+      connection.model('Bloqueo', BloqueosSchema);
   }
-  async createBloqueo(hotel: string, body: any) {
+
+  async findAll(): Promise<Bloqueos[]> {
+    return this.bloqueosModel
+      .find()
+      .then((data) => {
+        if (!data) return;
+        return data;
+      })
+      .catch((err) => err);
+  }
+
+  async createBloqueo(body: any) {
     const bloqueoBase = {
       Habitacion: body.Habitacion,
       Desde: body.Desde,
       Hasta: body.Hasta,
       Estatus: body.bloqueoState,
       Comentarios: body.Comentarios,
-      hotel: hotel,
     };
 
-    // Use Promise.all to handle multiple room operations concurrently
     const results = await Promise.all(
       body.Cuarto.map(async (element: string) => {
         const cuartoArray = [element];
 
         try {
-          // Check for existing documents with identical properties
           const existingBloqueo = await this.bloqueosModel.findOne({
             Habitacion: bloqueoBase.Habitacion,
             Cuarto: cuartoArray,
@@ -46,7 +46,6 @@ export class BloqueosService {
             Hasta: bloqueoBase.Hasta,
             Estatus: bloqueoBase.Estatus,
             Comentarios: bloqueoBase.Comentarios,
-            hotel: bloqueoBase.hotel,
           });
 
           if (existingBloqueo) {
@@ -56,7 +55,6 @@ export class BloqueosService {
             };
           }
 
-          // If no existing document, create the new one
           const data = await this.bloqueosModel.create({
             ...bloqueoBase,
             Cuarto: cuartoArray,
@@ -66,7 +64,7 @@ export class BloqueosService {
             message: 'Bloqueo guardado con éxito',
             document: data,
           };
-        } catch (err) {
+        } catch (err: any) {
           console.error('Error creating document:', err);
           return {
             message: 'Error al crear el documento',
@@ -76,23 +74,14 @@ export class BloqueosService {
       }),
     );
 
-    // Return the results for all operations
     return results;
   }
 
   async deleteBloqueo(bloqueoId: string): Promise<any> {
     try {
-      const result = await this.bloqueosModel
-        .updateOne(
-          { _id: bloqueoId },
-          {
-            $set: {
-              Completed: true,
-            },
-          },
-        )
+      return await this.bloqueosModel
+        .updateOne({ _id: bloqueoId }, { $set: { Completed: true } })
         .exec();
-      return result;
     } catch (err) {
       throw new Error('Error deleting Bloqueo');
     }

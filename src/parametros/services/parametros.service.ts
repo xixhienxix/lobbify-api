@@ -5,25 +5,32 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  Scope,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Parametros } from '../models/parametros.model';
-import { Model } from 'mongoose';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { Connection, Model } from 'mongoose';
+import { Parametros, ParametrosSchema } from '../models/parametros.model';
 import { ADMIN_FIELDS } from 'src/constraints/admin-fields-constraints';
 import { HotelSchedulerService } from 'src/scheduler/scheduler.tasks';
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class ParametrosService {
-  constructor(
-    @InjectModel('Parametros') private parametrosModel: Model<Parametros>,
-    @Inject(forwardRef(() => HotelSchedulerService))
-    private hotelSchedulerService: HotelSchedulerService,
-  ) {}
-
+  private parametrosModel: Model<Parametros>;
   private readonly logger = new Logger(ParametrosService.name);
 
+  constructor(
+    @Inject(REQUEST) private readonly request: Request,
+    @Inject(forwardRef(() => HotelSchedulerService))
+    private hotelSchedulerService: HotelSchedulerService,
+  ) {
+    const connection: Connection = (request as any).dbConnection;
+    this.parametrosModel =
+      connection.models['Parametros'] ||
+      connection.model('Parametros', ParametrosSchema);
+  }
+
   async getAll(
-    hotel: string,
     role: string,
     restrictedFields: readonly string[],
   ): Promise<Parametros> {
@@ -33,22 +40,17 @@ export class ParametrosService {
         : restrictedFields.reduce((acc, field) => ({ ...acc, [field]: 0 }), {});
     try {
       const data = await this.parametrosModel
-        .findOne({ hotel })
+        .findOne()
         .select(projection)
         .lean()
         .exec();
 
-      if (!data) {
-        throw new NotFoundException(`No parametros found for hotel: ${hotel}`);
-      }
+      if (!data) throw new NotFoundException('No parametros found');
       return data;
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-
+    } catch (error: any) {
+      if (error instanceof NotFoundException) throw error;
       this.logger.error(
-        `Database error fetching parametros for hotel ${hotel}: ${error.message}`,
+        `Database error fetching parametros: ${error.message}`,
         error.stack,
       );
       throw new InternalServerErrorException(
@@ -57,22 +59,15 @@ export class ParametrosService {
     }
   }
 
-  async getAllHotels(): Promise<string[]> {
+  async getHotelParams(): Promise<Parametros> {
     try {
-      const data = await this.parametrosModel.distinct('hotel').exec();
-
-      if (data.length === 0) {
-        throw new NotFoundException('No hotels found in Parametros collection');
-      }
-
+      const data = await this.parametrosModel.findOne().lean().exec();
+      if (!data) throw new NotFoundException('No parametros found');
       return data;
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-
+    } catch (error: any) {
+      if (error instanceof NotFoundException) throw error;
       this.logger.error(
-        `Database error fetching parametros for hotels: ${error.message}`,
+        `Database error fetching parametros: ${error.message}`,
         error.stack,
       );
       throw new InternalServerErrorException(
@@ -81,48 +76,19 @@ export class ParametrosService {
     }
   }
 
-  async getHotelParams(hotel: string): Promise<Parametros> {
+  async postParametros(body: any) {
+    const hotelId = (this.request as any).hotelId;
     try {
-      const data = await this.parametrosModel.findOne({ hotel }).lean().exec();
-
-      if (!data) {
-        throw new NotFoundException(`No parametros found for hotel ${hotel}`);
-      }
-
-      return data;
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-
-      this.logger.error(
-        `Database error fetching parametros for hotels: ${error.message}`,
-        error.stack,
-      );
-      throw new InternalServerErrorException(
-        'Failed to fetch parametros configuration',
-      );
-    }
-  }
-
-  async postParametros(hotel: string, body: any) {
-    const filter = { hotel: hotel };
-    body.parametros.hotel = hotel;
-    try {
-      // Delete the existing document that matches the filter
-      await this.parametrosModel.deleteOne(filter);
-
-      // Create a new document with the provided body.parametros
+      await this.parametrosModel.deleteOne({});
       const newParametros = new this.parametrosModel(body.parametros);
       const data = await newParametros.save();
-
       await this.hotelSchedulerService.updateHotelSchedule(
-        hotel,
+        hotelId,
         body.parametros.checkOut,
       );
       return data;
     } catch (err) {
-      console.log(err); // Log any errors that occur
+      console.log(err);
       return err;
     }
   }

@@ -7,7 +7,6 @@ import {
   Param,
   Post,
   Put,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { RolesUserGuard } from 'src/guards/roles.user.guard';
@@ -19,17 +18,14 @@ export class BloqueosController {
 
   @Get('/bloqueos/getAll')
   @UseGuards(RolesUserGuard)
-  async findAllBloqueos(@Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._BloqueosService.findAll(hotel);
+  async findAllBloqueos(): Promise<any> {
+    return this._BloqueosService.findAll();
   }
 
   @Post('/post/bloqueos')
   @UseGuards(RolesUserGuard)
-  async postReservaton(@Body() body, @Req() request: Request) {
-    const hotel = request.headers['hotel'];
-    return this._BloqueosService.createBloqueo(hotel, body);
+  async postReservaton(@Body() body) {
+    return this._BloqueosService.createBloqueo(body);
   }
 
   @Put('/reportes/borrar-bloqueo/:id')
@@ -40,11 +36,8 @@ export class BloqueosController {
       if (result.deletedCount === 0) {
         throw new HttpException('Bloqueo not found', HttpStatus.NOT_FOUND);
       }
-      return {
-        message: 'Bloqueo deleted!',
-        bloqueo: result,
-      };
-    } catch (err) {
+      return { message: 'Bloqueo deleted!', bloqueo: result };
+    } catch (err: any) {
       throw new HttpException(err.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

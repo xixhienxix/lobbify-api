@@ -1,65 +1,57 @@
-import { Injectable } from '@nestjs/common';
-import { tarifas } from '../_models/tarifas.model';
-import { InjectModel } from '@nestjs/mongoose';
-import mongoose, { Model } from 'mongoose';
+import { Injectable, Scope, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { Connection, Model } from 'mongoose';
+import { tarifas, TarifasSchema } from '../_models/tarifas.model';
 import { DateTime } from 'luxon';
 import { RatesGateway } from '../_gateway/rates.gateway';
-@Injectable()
+import mongoose from 'mongoose';
+
+@Injectable({ scope: Scope.REQUEST })
 export class TarifasService {
+  private tarifasModel: Model<tarifas>;
+
   constructor(
     private ratesGateway: RatesGateway,
-    @InjectModel(tarifas.name) private tarifasModel: Model<tarifas>,
-  ) {}
-
-  async findAllRates(hotel: string): Promise<tarifas[]> {
-    return this.tarifasModel
-      .find({ hotel: hotel })
-      .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
-      })
-      .catch((err) => {
-        return err;
-      });
+    @Inject(REQUEST) private readonly request: Request,
+  ) {
+    const connection: Connection = (request as any).dbConnection;
+    this.tarifasModel =
+      connection.models['Tarifas'] ||
+      connection.model('Tarifas', TarifasSchema);
   }
 
-  async findActiveRates(hotel: string): Promise<tarifas[]> {
-    const tz = 'America/Mexico_City';
+  async findAllRates(): Promise<tarifas[]> {
+    return this.tarifasModel
+      .find()
+      .then((data) => {
+        if (!data) return;
+        return data;
+      })
+      .catch((err) => err);
+  }
 
+  async findActiveRates(): Promise<tarifas[]> {
+    const tz = 'America/Mexico_City';
     const today = DateTime.now().setZone(tz).startOf('day').toJSDate();
 
-    const result = await this.tarifasModel
+    return this.tarifasModel
       .find({
-        hotel,
         Estado: true,
         Llegada: { $lte: today },
         Salida: { $gte: today },
       })
       .exec();
-
-    console.log(
-      'Filtering Rates:',
-      result.map((r) => r.Tarifa),
-    ); // Cleaner log
-
-    return result;
   }
 
-  async findActiveRatesByDate(hotel: string, date: string): Promise<tarifas[]> {
+  async findActiveRatesByDate(date: string): Promise<tarifas[]> {
     const tz = 'America/Mexico_City';
-
-    // Convertimos la fecha recibida y la normalizamos a 00:00 hora local
     const targetDate = DateTime.fromISO(date, { zone: tz })
       .startOf('day')
       .toJSDate();
 
     return this.tarifasModel
       .find({
-        hotel,
         Estado: true,
         Llegada: { $lte: targetDate },
         Salida: { $gte: targetDate },
@@ -67,23 +59,17 @@ export class TarifasService {
       .exec();
   }
 
-  async findAllRackRates(hotel: string): Promise<tarifas[]> {
+  async findAllRackRates(): Promise<tarifas[]> {
     return this.tarifasModel
-      .find({ Tarifa: 'Tarifa Estandar', hotel: hotel })
+      .find({ Tarifa: 'Tarifa Estandar' })
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+        if (!data) return;
+        return data;
       })
-      .catch((err) => {
-        return err;
-      });
+      .catch((err) => err);
   }
 
-  async postTarifa(hotel, body): Promise<any> {
+  async postTarifa(body): Promise<any> {
     const id = new mongoose.Types.ObjectId();
 
     const newRate = new this.tarifasModel({
@@ -105,22 +91,17 @@ export class TarifasService {
       Descuento: body.tarifa.Descuento,
       Visibilidad: body.tarifa.Visibilidad,
       Cancelacion: body.tarifa.Cancelacion,
-      hotel: hotel,
     });
 
     try {
       const data = await newRate.save();
-
       if (data) {
-        // ✅ Broadcast websocket event
         this.ratesGateway.broadcastRatesUpdate();
-
         return { message: 'Tarifa generada con exito' };
-      } else {
-        return {
-          message: 'No se pudo Guardar la Tarifa Intente de nuevo mas tarde',
-        };
       }
+      return {
+        message: 'No se pudo Guardar la Tarifa Intente de nuevo mas tarde',
+      };
     } catch (err) {
       console.log(err);
       return err;
@@ -130,23 +111,16 @@ export class TarifasService {
   async updateTarifaBase(body): Promise<tarifas> {
     return this.tarifasModel
       .findOneAndUpdate(
-        {
-          Habitacion: { $in: [body.tarifas.Habitacion] },
-        },
-        {
-          TarifaRack: body.tarifas.TarifaRack,
-        },
+        { Habitacion: { $in: [body.tarifas.Habitacion] } },
+        { TarifaRack: body.tarifas.TarifaRack },
         { upsert: true, setDefaultsOnInsert: true, new: true },
       )
       .then((data) => {
-        if (!data) {
+        if (!data)
           return {
             message: 'No se pudo Guardar la Tarifa Intente de nuevo mas tarde',
           };
-        }
-        if (data) {
-          return { message: 'Tarifa generada con exito' };
-        }
+        return { message: 'Tarifa generada con exito' };
       })
       .catch((err) => {
         console.log(err);
@@ -155,33 +129,14 @@ export class TarifasService {
   }
 
   async updateTarifaEspecial(body): Promise<tarifas> {
-    const update = body.tarifas;
-    // let filter = {};
-    // if (body.tarifas.Tarifa === 'Tarifa De Temporada') {
-    //   filter = {
-    //     hotel: hotel,
-    //     Tarifa: body.tarifas.Tarifa,
-    //     TarifasActivas: body.tarifas.TarifasActivas,
-    //   };
-    // } else {
-    //   filter = {
-    //     hotel: hotel,
-    //     Tarifa: body.tarifas.Tarifa,
-    //     Habitacion: body.tarifas.Habitacion,
-    //   };
-    // }
-
     return this.tarifasModel
-      .findOneAndUpdate({ _id: body.tarifas._id }, update)
+      .findOneAndUpdate({ _id: body.tarifas._id }, body.tarifas)
       .then((data) => {
-        if (!data) {
+        if (!data)
           return {
             message: 'No se pudo Guardar la Tarifa Intente de nuevo mas tarde',
           };
-        }
-        if (data) {
-          return { message: 'Tarifa generada con exito' };
-        }
+        return { message: 'Tarifa generada con exito' };
       })
       .catch((err) => {
         console.log(err);
@@ -191,20 +146,10 @@ export class TarifasService {
 
   async deleteTarifa(_id): Promise<any> {
     return this.tarifasModel
-      .deleteOne({
-        // Tarifa: body.tarifa.Tarifa,
-        // Habitacion: body.tarifa.Habitacion,
-        // TarifasActivas: body.tarifa.TarifasActivas,
-        // hotel: hotel,
-        _id: _id,
-      })
+      .deleteOne({ _id })
       .then((data) => {
-        if (!data) {
-          return;
-        }
-        if (data) {
-          return data;
-        }
+        if (!data) return;
+        return data;
       })
       .catch((err) => {
         console.log(err);

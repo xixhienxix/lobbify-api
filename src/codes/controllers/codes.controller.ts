@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Post,
-  Req,
   UseGuards,
   UsePipes,
   ValidationPipe,
@@ -18,44 +17,32 @@ export class CodesController {
 
   @Get('/codigos/getAll')
   @UseGuards(RolesUserGuard)
-  async findAllRooms(@Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._codesService.findAll(hotel);
+  async findAllRooms(): Promise<any> {
+    return this._codesService.findAll();
   }
+
   @Post('/codigos/new')
   @UseGuards(RolesUserGuard)
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  async newCodigo(
-    @Req() request: Request,
-    @Body() codigo: CreateCodeDto,
-  ): Promise<any> {
-    const hotel = request.headers['hotel'] as string;
-
-    return this._codesService.postNewCode(codigo, hotel);
+  async newCodigo(@Body() codigo: CreateCodeDto): Promise<any> {
+    return this._codesService.postNewCode(codigo);
   }
 
   @Get('estatus/all')
   @UseGuards(RolesUserGuard)
-  async findAllEstatus(@Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._codesService.findAllEstatus(hotel);
+  async findAllEstatus(): Promise<any> {
+    return this._codesService.findAllEstatus();
   }
 
   @Get('/folios/all')
   @UseGuards(RolesUserGuard)
-  async findAllFolios(@Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._codesService.findFolios(hotel);
+  async findAllFolios(): Promise<any> {
+    return this._codesService.findFolios();
   }
 
   @Get('/adicional/all')
   @UseGuards(RolesUserGuard)
-  async findAllAdicionales(@Req() request: Request): Promise<any> {
-    const hotel = request.headers['hotel'];
-
-    return this._codesService.findAdicional(hotel);
+  async findAllAdicionales(): Promise<any> {
+    return this._codesService.findAdicional();
   }
 }

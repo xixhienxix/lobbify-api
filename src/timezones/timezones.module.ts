@@ -1,15 +1,10 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { TimezonesSchema, timezone } from './_models/timezone.model';
 import { TimezonesController } from './controllers/timezones.controller';
 import { TimezonesService } from './_services/timezones.service';
+import { TenantModule } from 'src/tenant/tenant.module';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([
-      { name: timezone.name, schema: TimezonesSchema },
-    ]),
-  ],
+  imports: [TenantModule],
   controllers: [TimezonesController],
   providers: [TimezonesService],
 })

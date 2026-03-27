@@ -1,17 +1,20 @@
 import { forwardRef, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { GuestService } from 'src/guests/services/guest.service';
-import { Parametros } from 'src/parametros/models/parametros.model';
-import { ParametrosService } from 'src/parametros/services/parametros.service';
+import { TenantService } from 'src/tenant/tenant.service';
+import {
+  Parametros,
+  ParametrosSchema,
+} from 'src/parametros/models/parametros.model';
+import { huespeds, GuestSchema } from 'src/guests/models/guest.model';
+import { Connection, Model } from 'mongoose';
+import { DateTime } from 'luxon';
 
 @Injectable()
 export class HotelSchedulerService implements OnModuleInit {
   constructor(
     private schedulerRegistry: SchedulerRegistry,
-    @Inject(forwardRef(() => ParametrosService))
-    private parametrosService: ParametrosService,
-    private reservatrionsService: GuestService,
+    private tenantService: TenantService,
   ) {}
 
   private executionHistory: Array<{
@@ -25,6 +28,26 @@ export class HotelSchedulerService implements OnModuleInit {
 
   private readonly MAX_HISTORY = 100;
 
+  // Get models directly from TenantService connection — no request needed
+  private async getModels(hotelId: string): Promise<{
+    parametrosModel: Model<Parametros>;
+    guestModel: Model<huespeds>;
+  }> {
+    const connection: Connection = await this.tenantService.getConnection(
+      hotelId,
+    );
+
+    const parametrosModel =
+      connection.models['Parametros'] ||
+      connection.model('Parametros', ParametrosSchema);
+
+    const guestModel =
+      connection.models['Reservaciones'] ||
+      connection.model('Reservaciones', GuestSchema);
+
+    return { parametrosModel, guestModel };
+  }
+
   async onModuleInit() {
     console.log('Loading all hotel schedules...');
     await this.loadAllHotelSchedules();
@@ -34,21 +57,16 @@ export class HotelSchedulerService implements OnModuleInit {
     console.log('📊 Fetching hotels from database...');
 
     try {
-      const hotels = await this.parametrosService.getAllHotels();
+      // Get all known hotelIds from the connection cache
+      const hotels = await this.tenantService.getAllHotelIds();
       console.log(`✅ Found ${hotels.length} hotels`);
 
       for (const hotel of hotels) {
         console.log(`\n📍 Processing hotel: ${hotel}`);
-
-        const parameters = await this.parametrosService.getHotelParams(hotel);
+        const parameters = await this.getHotelParams(hotel);
 
         if (parameters?.checkOut) {
           const cronExpression = this.timeToCron(parameters.checkOut);
-          console.log(`   ⏰ CheckOut time: ${parameters.checkOut}`);
-          console.log(
-            `   🌍 Timezone: ${parameters.codigoZona || 'UTC (default)'}`,
-          );
-
           this.scheduleHotelJob(hotel, cronExpression, parameters);
         } else {
           console.warn(`   ⚠️ No checkOut time found for hotel ${hotel}`);
@@ -62,12 +80,21 @@ export class HotelSchedulerService implements OnModuleInit {
     }
   }
 
+  async getHotelParams(hotelId: string): Promise<Parametros | null> {
+    try {
+      const { parametrosModel } = await this.getModels(hotelId);
+      return await parametrosModel.findOne().lean().exec();
+    } catch (error) {
+      console.error(`Error fetching params for hotel ${hotelId}:`, error);
+      return null;
+    }
+  }
+
   private scheduleHotelJob(
     hotelId: string,
     cronExpression: string,
     parameters: Parametros,
   ) {
-    // Use the timezone from database, fallback to UTC if not provided
     const timezone = parameters.codigoZona || 'UTC';
 
     const job = new CronJob(
@@ -80,94 +107,171 @@ export class HotelSchedulerService implements OnModuleInit {
       },
       null,
       true,
-      timezone, // Use timezone from database
+      timezone,
     );
 
     this.schedulerRegistry.addCronJob(`hotel-${hotelId}`, job);
-
     console.log(`✅ Scheduled job for hotel ${hotelId}`);
-    console.log(`   📅 Cron expression: ${cronExpression}`);
-    console.log(`   🌍 Timezone: ${timezone}`);
+    console.log(`   📅 Cron: ${cronExpression} | 🌍 TZ: ${timezone}`);
     console.log(`   ⏰ Next run: ${job.nextDate()?.toISO()}`);
-    console.log(`   ⏰ Next run (UTC): ${job.nextDate()?.toUTC().toISO()}`);
   }
 
   private async executeHotelTask(hotelId: string, parameters: Parametros) {
     console.log(`Executing scheduled task for hotel: ${hotelId}`);
 
     try {
+      const { guestModel } = await this.getModels(hotelId);
       const checkOut = parameters?.checkOut;
 
-      // Find all late checkouts for today
-      const lateCheckouts =
-        await this.reservatrionsService.findTodayLateCheckouts(
-          hotelId,
-          checkOut,
-        );
+      const lateCheckouts = await this.findTodayLateCheckouts(
+        guestModel,
+        checkOut,
+      );
 
       if (lateCheckouts.length === 0) {
         console.log(`No late checkouts found for hotel ${hotelId}`);
         return;
       }
 
-      // Extract folios
-      const folios = lateCheckouts.map((reservation) => reservation.folio);
-
-      // Update all late checkouts to lateCheckOut: true
-      const result = await this.reservatrionsService.updateLateCheckOutStatus(
-        hotelId,
-        folios,
-      );
+      const folios = lateCheckouts.map((r) => r.folio);
+      const result = await this.updateLateCheckOutStatus(guestModel, folios);
 
       console.log(
-        `✅ Hotel ${hotelId}: Found ${lateCheckouts.length} late checkouts, updated ${result.modifiedCount} reservations`,
+        `✅ Hotel ${hotelId}: Found ${lateCheckouts.length} late checkouts, updated ${result.modifiedCount}`,
       );
     } catch (error) {
       console.error(`❌ Error processing hotel ${hotelId}:`, error);
     }
   }
 
-  private async handleLateCheckout(reservation: any) {
-    console.log(`Late checkout: ${reservation.folio} - ${reservation.nombre}`);
+  private async findTodayLateCheckouts(
+    guestModel: Model<huespeds>,
+    cutoffTime = '12:00',
+  ) {
+    const [cutoffHours, cutoffMinutes] = cutoffTime.split(':').map(Number);
+    const now = new Date();
+
+    return guestModel.aggregate([
+      {
+        $match: {
+          estatus: 'Huesped en Casa',
+          lateCheckOut: { $ne: 'Colgado' },
+        },
+      },
+      {
+        $addFields: {
+          salidaDate: {
+            $cond: {
+              if: { $eq: [{ $type: '$salida' }, 'string'] },
+              then: { $dateFromString: { dateString: '$salida' } },
+              else: '$salida',
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          salidaYear: { $year: '$salidaDate' },
+          salidaMonth: { $month: '$salidaDate' },
+          salidaDay: { $dayOfMonth: '$salidaDate' },
+          salidaTotalMinutes: {
+            $add: [
+              { $multiply: [{ $hour: '$salidaDate' }, 60] },
+              { $minute: '$salidaDate' },
+            ],
+          },
+        },
+      },
+      {
+        $match: {
+          $or: [
+            {
+              $expr: {
+                $or: [
+                  { $lt: ['$salidaYear', now.getFullYear()] },
+                  {
+                    $and: [
+                      { $eq: ['$salidaYear', now.getFullYear()] },
+                      { $lt: ['$salidaMonth', now.getMonth() + 1] },
+                    ],
+                  },
+                  {
+                    $and: [
+                      { $eq: ['$salidaYear', now.getFullYear()] },
+                      { $eq: ['$salidaMonth', now.getMonth() + 1] },
+                      { $lt: ['$salidaDay', now.getDate()] },
+                    ],
+                  },
+                ],
+              },
+            },
+            {
+              $expr: {
+                $and: [
+                  { $eq: ['$salidaYear', now.getFullYear()] },
+                  { $eq: ['$salidaMonth', now.getMonth() + 1] },
+                  { $eq: ['$salidaDay', now.getDate()] },
+                  {
+                    $gt: [
+                      '$salidaTotalMinutes',
+                      cutoffHours * 60 + cutoffMinutes,
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+      {
+        $project: {
+          salidaDate: 0,
+          salidaYear: 0,
+          salidaMonth: 0,
+          salidaDay: 0,
+          salidaTotalMinutes: 0,
+        },
+      },
+    ]);
   }
 
-  private timeToCron(time: string): string {
-    // Convert "17:00" to "0 17 * * *" (runs daily at that time)
-    const [hours, minutes] = time.split(':');
-    return `${minutes} ${hours} * * *`;
+  private async updateLateCheckOutStatus(
+    guestModel: Model<huespeds>,
+    folios: string[],
+  ) {
+    if (folios.length === 0) return { modifiedCount: 0, matchedCount: 0 };
+    return guestModel.updateMany(
+      { folio: { $in: folios } },
+      { $set: { lateCheckOut: 'Late Check-Out' } },
+    );
   }
 
-  // In HotelSchedulerService
   async updateHotelSchedule(hotelId: string, newTime: string) {
     const jobName = `hotel-${hotelId}`;
 
     try {
-      // Remove existing job
       this.schedulerRegistry.deleteCronJob(jobName);
       console.log(`Deleted old schedule for hotel ${hotelId}`);
     } catch (e) {
-      // Job doesn't exist yet, that's fine
       console.log(`No existing schedule found for hotel ${hotelId}`);
     }
 
-    // Get updated parameters
-    const parameters = await this.parametrosService.getHotelParams(hotelId);
-
-    // Schedule new job with updated time
+    const parameters = await this.getHotelParams(hotelId);
     const cronExpression = this.timeToCron(newTime);
     this.scheduleHotelJob(hotelId, cronExpression, parameters);
-
     console.log(`✅ Updated schedule for hotel ${hotelId} to ${newTime}`);
   }
 
-  // In HotelSchedulerService
   async testHotelTask(hotelId: string) {
     console.log('🧪 MANUALLY TESTING TASK FOR:', hotelId);
-
-    const parameters = await this.parametrosService.getHotelParams(hotelId);
+    const parameters = await this.getHotelParams(hotelId);
     await this.executeHotelTask(hotelId, parameters);
-
     console.log('🧪 TEST COMPLETE');
+  }
+
+  private timeToCron(time: string): string {
+    const [hours, minutes] = time.split(':');
+    return `${minutes} ${hours} * * *`;
   }
 
   private addExecutionLog(log: {
@@ -178,9 +282,7 @@ export class HotelSchedulerService implements OnModuleInit {
     updated: number;
     error?: string;
   }) {
-    this.executionHistory.unshift(log); // Add to beginning
-
-    // Keep only last MAX_HISTORY entries
+    this.executionHistory.unshift(log);
     if (this.executionHistory.length > this.MAX_HISTORY) {
       this.executionHistory = this.executionHistory.slice(0, this.MAX_HISTORY);
     }
@@ -188,37 +290,20 @@ export class HotelSchedulerService implements OnModuleInit {
 
   getExecutionHistory(hotelId?: string, limit = 50) {
     let history = this.executionHistory;
-
-    if (hotelId) {
-      history = history.filter((log) => log.hotelId === hotelId);
-    }
-
+    if (hotelId) history = history.filter((log) => log.hotelId === hotelId);
     return history.slice(0, limit);
   }
 
   getExecutionStats(hotelId?: string) {
     let history = this.executionHistory;
-
-    if (hotelId) {
-      history = history.filter((log) => log.hotelId === hotelId);
-    }
-
-    const total = history.length;
-    const successful = history.filter((log) => log.status === 'success').length;
-    const failed = history.filter((log) => log.status === 'error').length;
-    const totalCheckoutsProcessed = history.reduce(
-      (sum, log) => sum + log.updated,
-      0,
-    );
-
-    const lastExecution = history[0];
+    if (hotelId) history = history.filter((log) => log.hotelId === hotelId);
 
     return {
-      total,
-      successful,
-      failed,
-      totalCheckoutsProcessed,
-      lastExecution,
+      total: history.length,
+      successful: history.filter((l) => l.status === 'success').length,
+      failed: history.filter((l) => l.status === 'error').length,
+      totalCheckoutsProcessed: history.reduce((sum, l) => sum + l.updated, 0),
+      lastExecution: history[0],
     };
   }
 }
