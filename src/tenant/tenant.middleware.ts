@@ -18,6 +18,8 @@ export class TenantMiddleware implements NestMiddleware {
     }
 
     const hotelId = req.headers['x-hotel-id'] as string;
+    console.log(' x-hotel-id received:', hotelId);
+
     if (!hotelId) {
       throw new BadRequestException('Missing x-hotel-id header');
     }
