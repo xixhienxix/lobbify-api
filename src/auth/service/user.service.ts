@@ -130,7 +130,6 @@ export class UserService {
       console.log(`   Match found:`, !!user);
 
       if (user) {
-        // 👇 match the exact structure the guard expects
         const authJwtToken = jwt.sign(
           { usuariosResultQuery: user },
           JWTSECRET,

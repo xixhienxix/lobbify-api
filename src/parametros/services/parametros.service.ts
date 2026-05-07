@@ -59,6 +59,29 @@ export class ParametrosService {
     }
   }
 
+  async getAllWithoutRole(): Promise<Parametros> {
+    try {
+      const data = await this.parametrosModel.findOne().lean().exec();
+
+      if (!data) {
+        throw new NotFoundException('No parametros found');
+      }
+
+      return data;
+    } catch (error: any) {
+      if (error instanceof NotFoundException) throw error;
+
+      this.logger.error(
+        `Database error fetching parametros: ${error.message}`,
+        error.stack,
+      );
+
+      throw new InternalServerErrorException(
+        'Failed to fetch parametros configuration',
+      );
+    }
+  }
+
   async getHotelParams(): Promise<Parametros> {
     try {
       const data = await this.parametrosModel.findOne().lean().exec();

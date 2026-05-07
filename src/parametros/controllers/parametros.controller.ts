@@ -16,6 +16,11 @@ export class ParametrosController {
     return this._parametrosService.getAll(role, ADMIN_FIELDS.PARAMETROS);
   }
 
+  @Get('/parametros/public')
+  async getParametrosPublic(): Promise<any> {
+    return this._parametrosService.getAllWithoutRole();
+  }
+
   @Post('/parametros/save')
   @UseGuards(RolesUserGuard)
   async postParametros(@Body() body) {
