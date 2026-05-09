@@ -7,8 +7,13 @@ import { CorsIoAdapter } from './config/socket.io.adapter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.useGlobalPipes(new ValidationPipe());
-
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // strips unknown properties
+      forbidNonWhitelisted: false, // don't throw on extra props
+      transform: true, // auto-transform types (string → number etc)
+    }),
+  );
   app.useWebSocketAdapter(new CorsIoAdapter(app, corsOriginHandler));
 
   app.enableCors({

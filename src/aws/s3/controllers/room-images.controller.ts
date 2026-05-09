@@ -1,30 +1,30 @@
-import {
-  Controller,
-  Post,
-  Delete,
-  Param,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Delete, Param, Body } from '@nestjs/common';
+import { IsString, IsNumber, IsBoolean, IsOptional } from 'class-validator';
 import { RoomImagesService } from '../services/s3.service';
-import { RolesUserGuard } from 'src/guards/roles.user.guard';
 
-class PresignDto {
+export class PresignDto {
+  @IsString()
   fileType: string;
+
+  @IsNumber()
   fileSize: number;
 }
 
-class ConfirmDto {
+export class ConfirmDto {
+  @IsString()
   key: string;
+
+  @IsBoolean()
+  @IsOptional()
   isCover?: boolean;
 }
 
-class DeleteImageDto {
+export class DeleteImageDto {
+  @IsString()
   key: string;
 }
 
 @Controller('rooms')
-@UseGuards(RolesUserGuard)
 export class RoomImagesController {
   constructor(private readonly roomImagesService: RoomImagesService) {}
 

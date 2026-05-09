@@ -46,6 +46,8 @@ export class RoomImagesService {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       },
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
     });
 
     this.bucket = process.env.AWS_S3_BUCKET;
@@ -71,12 +73,22 @@ export class RoomImagesService {
       Bucket: this.bucket,
       Key: key,
       ContentType: fileType,
-      ContentLength: fileSize,
     });
 
     const uploadUrl = await getSignedUrl(this.s3, command, { expiresIn: 300 });
 
-    return { uploadUrl, key, finalUrl: `${this.cdnUrl}/${key}` };
+    // Strip checksum params the AWS SDK v3 adds by default —
+    // these cause 403 Forbidden because the browser fetch PUT
+    // doesn't send the matching checksum header
+    const cleanUrl = new URL(uploadUrl);
+    cleanUrl.searchParams.delete('x-amz-checksum-algorithm');
+    cleanUrl.searchParams.delete('x-amz-sdk-checksum-algorithm');
+
+    return {
+      uploadUrl: cleanUrl.toString(),
+      key,
+      finalUrl: `${this.cdnUrl}/${key}`,
+    };
   }
 
   async confirmUpload(codigo: string, key: string, isCover: boolean) {
