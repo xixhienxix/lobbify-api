@@ -1,4 +1,4 @@
-import { Controller, Post, Delete, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body } from '@nestjs/common';
 import { IsString, IsNumber, IsBoolean, IsOptional } from 'class-validator';
 import { RoomImagesService } from '../services/s3.service';
 
@@ -27,6 +27,12 @@ export class DeleteImageDto {
 @Controller('rooms')
 export class RoomImagesController {
   constructor(private readonly roomImagesService: RoomImagesService) {}
+
+  // ── NEW: GET images for a room (used by edit modal to load existing images) ──
+  @Get(':codigo/images')
+  getImages(@Param('codigo') codigo: string) {
+    return this.roomImagesService.getImages(codigo);
+  }
 
   @Post(':codigo/images/presign')
   getPresignedUrl(@Param('codigo') codigo: string, @Body() body: PresignDto) {

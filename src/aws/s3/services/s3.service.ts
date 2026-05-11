@@ -33,7 +33,6 @@ export class RoomImagesService {
   private cdnUrl: string;
 
   constructor(@Inject(REQUEST) private readonly request: Request) {
-    // Same multi-tenant pattern as RoomsService
     const connection: Connection = (request as any).dbConnection;
 
     this.habitacionModel =
@@ -54,6 +53,28 @@ export class RoomImagesService {
     this.cdnUrl = process.env.CLOUDFRONT_URL;
   }
 
+  private getHotelId(): string {
+    const hotelId = (this.request.headers['x-hotel-id'] as string)
+      ?.toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '_');
+
+    if (!hotelId) {
+      throw new BadRequestException('Missing hotel id');
+    }
+    return hotelId;
+  }
+
+  // ── NEW: fetch images[] for a room, keyed by Codigo ─────────────────────────
+  async getImages(codigo: string): Promise<RoomImage[]> {
+    // All inventory rows share the same images[] — grab from the first match
+    const room = await this.habitacionModel
+      .findOne({ Codigo: codigo })
+      .select('images')
+      .lean();
+
+    return room?.images ?? [];
+  }
+
   async getPresignedUrl(codigo: string, fileType: string, fileSize: number) {
     if (!ALLOWED_TYPES.includes(fileType)) {
       throw new BadRequestException(
@@ -67,19 +88,19 @@ export class RoomImagesService {
     const extension = fileType.split('/')[1];
     const uniqueId = uuid();
     const safeCode = codigo.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-    const key = `rooms/${safeCode}/original_${uniqueId}.${extension}`;
+    const hotelId = this.getHotelId();
+
+    const key = `hotels/${hotelId}/rooms/${safeCode}/original_${uniqueId}.${extension}`;
 
     const command = new PutObjectCommand({
       Bucket: this.bucket,
       Key: key,
-      ContentType: fileType,
+      // No ContentType — removes it from the signature entirely
+      // so S3 accepts the PUT regardless of what Content-Type the browser sends
     });
 
     const uploadUrl = await getSignedUrl(this.s3, command, { expiresIn: 300 });
 
-    // Strip checksum params the AWS SDK v3 adds by default —
-    // these cause 403 Forbidden because the browser fetch PUT
-    // doesn't send the matching checksum header
     const cleanUrl = new URL(uploadUrl);
     cleanUrl.searchParams.delete('x-amz-checksum-algorithm');
     cleanUrl.searchParams.delete('x-amz-sdk-checksum-algorithm');
@@ -92,33 +113,54 @@ export class RoomImagesService {
   }
 
   async confirmUpload(codigo: string, key: string, isCover: boolean) {
+    const hotelId = this.getHotelId();
+
+    // Validate that uploaded image belongs to this tenant
+    const expectedPrefix = `hotels/${hotelId}/rooms/`;
+    if (!key.startsWith(expectedPrefix)) {
+      throw new BadRequestException(
+        'Invalid image key for current hotel tenant',
+      );
+    }
+
     const exists = await this.habitacionModel.findOne({ Codigo: codigo });
     if (!exists) {
       throw new NotFoundException(`Habitación ${codigo} no encontrada`);
     }
 
+    // Derive the sibling keys that Lambda will generate
+    // Lambda naming: original_<uuid>.<ext>  →  thumb_<uuid>.webp  etc.
+    const folder = key.substring(0, key.lastIndexOf('/'));
+    const fileName = key.split('/').pop(); // e.g. original_abc123.jpeg
+    const baseName = fileName
+      .replace('original_', '') // abc123.jpeg
+      .split('.')[0]; // abc123
+
     const imageEntry: RoomImage = {
       key,
-      thumbKey: key.replace(/original_(.+)\..+$/, 'thumb_$1.webp'),
-      mediumKey: key.replace(/original_(.+)\..+$/, 'medium_$1.webp'),
-      largeKey: key.replace(/original_(.+)\..+$/, 'large_$1.webp'),
+      thumbKey: `${folder}/thumb_${baseName}.webp`,
+      mediumKey: `${folder}/medium_${baseName}.webp`,
+      largeKey: `${folder}/large_${baseName}.webp`,
       isCover: isCover || false,
       uploadedAt: new Date(),
     };
 
     if (isCover) {
+      // Unset cover on all existing images across all inventory rows for this code
       await this.habitacionModel.updateMany(
         { Codigo: codigo },
         { $set: { 'images.$[].isCover': false } },
       );
     }
 
+    // Push new image entry to every inventory row with this Codigo
     await this.habitacionModel.updateMany(
       { Codigo: codigo },
       { $push: { images: imageEntry } },
     );
 
-    return { message: 'Imagen confirmada', image: imageEntry };
+    // Return the full entry so the frontend can immediately display it
+    return imageEntry;
   }
 
   async deleteImage(codigo: string, key: string) {
@@ -153,7 +195,8 @@ export class RoomImagesService {
 
   async deleteAllRoomImages(codigo: string) {
     const safeCode = codigo.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-    const prefix = `rooms/${safeCode}/`;
+    const hotelId = this.getHotelId();
+    const prefix = `hotels/${hotelId}/rooms/${safeCode}/`;
 
     const listed = await this.s3.send(
       new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix }),
