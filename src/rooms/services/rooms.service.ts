@@ -5,7 +5,6 @@ import { Connection, Model } from 'mongoose';
 import { room, RoomsSchema } from '../models/rooms.model';
 import { tarifas, TarifasSchema } from 'src/tarifas/_models/tarifas.model';
 import { GuestService } from 'src/guests/services/guest.service';
-import { reservationStatusMap } from 'src/interfaces/reservation.status';
 
 @Injectable({ scope: Scope.REQUEST })
 export class RoomsService {

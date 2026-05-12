@@ -155,6 +155,11 @@ export class RoomImagesService {
 
     // Push new image entry to every inventory row with this Codigo
     await this.habitacionModel.updateMany(
+      { Codigo: codigo, images: { $exists: false } },
+      { $set: { images: [] } },
+    );
+
+    await this.habitacionModel.updateMany(
       { Codigo: codigo },
       { $push: { images: imageEntry } },
     );

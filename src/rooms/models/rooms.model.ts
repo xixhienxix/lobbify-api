@@ -1,5 +1,7 @@
 import { SchemaFactory, Schema, Prop } from '@nestjs/mongoose';
 import * as mongoose from 'mongoose';
+
+@Schema({ _id: true })
 export class RoomImage {
   @Prop({ required: true })
   key: string; // rooms/presidencial/original_uuid.jpg
