@@ -7,6 +7,7 @@ export const ALLOWED_ORIGINS: (string | RegExp)[] = [
   'https://lobify-front.web.app',
   'https://d3lkfchxk2jil4.cloudfront.net',
   'https://milobify.com/login',
+  'https://app.lobify.mx',
 ];
 
 import { Logger } from '@nestjs/common';
