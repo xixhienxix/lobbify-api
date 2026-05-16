@@ -35,6 +35,12 @@ export class RoomImagesService {
   constructor(@Inject(REQUEST) private readonly request: Request) {
     const connection: Connection = (request as any).dbConnection;
 
+    if (!connection) {
+      throw new Error(
+        'dbConnection missing from request — tenant middleware may not be running for this route',
+      );
+    }
+
     this.habitacionModel =
       connection.models['Habitaciones'] ||
       connection.model('Habitaciones', RoomsSchema);
@@ -99,17 +105,23 @@ export class RoomImagesService {
       // so S3 accepts the PUT regardless of what Content-Type the browser sends
     });
 
-    const uploadUrl = await getSignedUrl(this.s3, command, { expiresIn: 300 });
+    try {
+      const uploadUrl = await getSignedUrl(this.s3, command, {
+        expiresIn: 300,
+      });
+      const cleanUrl = new URL(uploadUrl);
+      cleanUrl.searchParams.delete('x-amz-checksum-algorithm');
+      cleanUrl.searchParams.delete('x-amz-sdk-checksum-algorithm');
 
-    const cleanUrl = new URL(uploadUrl);
-    cleanUrl.searchParams.delete('x-amz-checksum-algorithm');
-    cleanUrl.searchParams.delete('x-amz-sdk-checksum-algorithm');
-
-    return {
-      uploadUrl: cleanUrl.toString(),
-      key,
-      finalUrl: `${this.cdnUrl}/${key}`,
-    };
+      return {
+        uploadUrl: cleanUrl.toString(),
+        key,
+        finalUrl: `${this.cdnUrl}/${key}`,
+      };
+    } catch (err) {
+      console.error('getSignedUrl failed:', err);
+      throw err;
+    }
   }
 
   async confirmUpload(codigo: string, key: string, isCover: boolean) {
@@ -123,10 +135,10 @@ export class RoomImagesService {
       );
     }
 
-    const exists = await this.habitacionModel.findOne({ Codigo: codigo });
-    if (!exists) {
-      throw new NotFoundException(`Habitación ${codigo} no encontrada`);
-    }
+    // const exists = await this.habitacionModel.findOne({ Codigo: codigo });
+    // if (!exists) {
+    //   throw new NotFoundException(`Habitación ${codigo} no encontrada`);
+    // }
 
     // Derive the sibling keys that Lambda will generate
     // Lambda naming: original_<uuid>.<ext>  →  thumb_<uuid>.webp  etc.
