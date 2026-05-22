@@ -95,6 +95,58 @@ export class GuestService {
     }
   }
 
+  async checkRoomHasActiveGuests(codigo: string): Promise<{
+    blocked: boolean;
+    hasHistorical: boolean;
+    reservations: huespeds[];
+  }> {
+    // Statuses that do NOT block deletion (cancelled, checked-out, no-show)
+    const nonBlockingStatuses = [
+      'Check-Out',
+      'Reserva Cancelada',
+      'No Show',
+      'Hizo Checkout',
+    ];
+
+    const today = DateTime.now()
+      .setZone('America/Mexico_City')
+      .startOf('day')
+      .toISO();
+
+    // Query 1: Active/future reservations for this room type — these BLOCK deletion
+    const activeReservations = await this.guestModel
+      .find({
+        habitacion: codigo,
+        salida: { $gte: today }, // from today onwards only — avoids full table scan
+        estatus: { $nin: nonBlockingStatuses },
+      })
+      .lean()
+      .exec();
+
+    if (activeReservations.length > 0) {
+      return {
+        blocked: true,
+        hasHistorical: false,
+        reservations: activeReservations,
+      };
+    }
+
+    // Query 2: Only if no blocking reservations — check if any historical (cancelled/checkout) exist
+    // This is a lightweight count query, no full document hydration needed
+    const historicalCount = await this.guestModel
+      .countDocuments({
+        habitacion: codigo,
+        estatus: { $in: nonBlockingStatuses },
+      })
+      .exec();
+
+    return {
+      blocked: false,
+      hasHistorical: historicalCount > 0,
+      reservations: [],
+    };
+  }
+
   async findByDateRange(
     startDate: string,
     endDate: string,

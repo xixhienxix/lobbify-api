@@ -65,4 +65,10 @@ export class TarifasController {
   deleteTarifaEspecial(@Param() _id) {
     return this._tarifasService.deleteTarifa(_id);
   }
+
+  @Delete('/tarifas/base/delete/:codigo')
+  @UseGuards(RolesUserGuard)
+  deleteTarifaBase(@Param('codigo') codigo: string) {
+    return this._tarifasService.deleteTarifaBaseByCodigo(codigo);
+  }
 }

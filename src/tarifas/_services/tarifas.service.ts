@@ -156,4 +156,20 @@ export class TarifasService {
         return err;
       });
   }
+
+  async deleteTarifaBaseByCodigo(codigo: string): Promise<any> {
+    return this.tarifasModel
+      .deleteOne({
+        Tarifa: 'Tarifa Base',
+        Habitacion: { $eq: [codigo] },
+      })
+      .then((data) => {
+        if (!data) return;
+        return data;
+      })
+      .catch((err) => {
+        console.log(err);
+        return err;
+      });
+  }
 }

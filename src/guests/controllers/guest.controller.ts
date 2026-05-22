@@ -48,6 +48,14 @@ export class GuestsController {
     return this._GuestService.postReservation(body);
   }
 
+  @Get('/huesped/room-check/:codigo')
+  @UseGuards(RolesUserGuard)
+  async checkRoomHasActiveGuests(
+    @Param('codigo') codigo: string,
+  ): Promise<any> {
+    return this._GuestService.checkRoomHasActiveGuests(codigo);
+  }
+
   @Post('/disponibilidad/reservas')
   @UseGuards(RolesUserGuard)
   async getDisponibilidad(@Body() body) {
