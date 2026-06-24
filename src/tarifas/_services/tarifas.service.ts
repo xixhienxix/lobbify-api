@@ -72,6 +72,8 @@ export class TarifasService {
   async postTarifa(body): Promise<any> {
     const id = new mongoose.Types.ObjectId();
 
+    console.log('tarifa -Z', body.tarifa);
+
     const newRate = new this.tarifasModel({
       _id: id,
       Tarifa: body.tarifa.Tarifa,

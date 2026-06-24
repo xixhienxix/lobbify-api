@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -30,5 +31,11 @@ export class PromosController {
   @UseGuards(RolesUserGuard)
   async deletePromo(@Param() _id): Promise<any> {
     return this._promosService.deletePromo(_id);
+  }
+
+  @Patch('/promos/:codigo/inventario')
+  @UseGuards(RolesUserGuard)
+  async decrementInventario(@Param('codigo') codigo: string): Promise<any> {
+    return this._promosService.decrementInventario(codigo);
   }
 }

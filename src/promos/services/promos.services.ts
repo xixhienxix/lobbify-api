@@ -119,4 +119,30 @@ export class PromosService {
         return err;
       });
   }
+
+  async decrementInventario(codigo: string): Promise<any> {
+    try {
+      const updated = await this.promosModel
+        .findOneAndUpdate(
+          { codigo, inventario: { $gt: 0 } }, // only decrement if > 0
+          { $inc: { inventario: -1 } },
+          { new: true },
+        )
+        .exec();
+
+      if (!updated) {
+        return {
+          success: false,
+          message: 'Promo not found or inventario already at 0.',
+        };
+      }
+
+      this.promosGateway.broadcastPromosUpdate();
+      return { success: true, inventario: updated.inventario };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error decrementing inventario:', message);
+      return { success: false, message };
+    }
+  }
 }
