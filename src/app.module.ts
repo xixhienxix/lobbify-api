@@ -29,11 +29,13 @@ import { BookingParametrosModule } from './booking/parametros.module';
 import { TenantModule } from './tenant/tenant.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { AdminModule } from './admin/admin.module';
+import { HotelSetupImportModule } from './importer/hotel-setup-import.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     ScheduleModule,
+    HotelSetupImportModule,
     AuthModule,
     PackagesModule,
     BloqueosModule,

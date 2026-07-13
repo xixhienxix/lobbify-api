@@ -12,8 +12,27 @@ export class TenantMiddleware implements NestMiddleware {
 
   // tenant.middleware.ts
   async use(req: Request, res: Response, next: NextFunction) {
-    const openRoutes = ['/login', '/getUserByToken', '/register'];
-    if (openRoutes.some((route) => req.originalUrl.startsWith(route))) {
+    console.log(
+      '🔎 METHOD:',
+      req.method,
+      '| URL:',
+      JSON.stringify(req.originalUrl),
+    );
+
+    const openRoutes = [
+      '/login',
+      '/getUserByToken',
+      '/register',
+      '/hotel-setup',
+      '/admin-import.html',
+    ];
+
+    const matched = openRoutes.some((route) =>
+      req.originalUrl.startsWith(route),
+    );
+    console.log('🔎 matched openRoutes?', matched); // 🔎 DEBUG TEMPORAL
+
+    if (matched) {
       return next();
     }
 

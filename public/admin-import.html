@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Importar Setup de Hotel</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #161a21;
+    --border: #262c36;
+    --text: #e6e8eb;
+    --muted: #8b93a1;
+    --accent: #4f8cff;
+    --accent-hover: #6ea0ff;
+    --ok: #3ecf8e;
+    --err: #ff5c5c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .card {
+    width: 100%;
+    max-width: 560px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.subtitle { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+  h2.section-title { font-size: 14px; color: var(--muted); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .session-badge {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: rgba(62, 207, 142, 0.1);
+    border: 1px solid var(--ok);
+    color: var(--ok);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  .session-badge button {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--muted);
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 32px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .dropzone.dragover {
+    border-color: var(--accent);
+    background: rgba(79, 140, 255, 0.08);
+  }
+  .dropzone .filename {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--accent);
+    word-break: break-all;
+  }
+  input[type="file"] { display: none; }
+
+  .fields { display: grid; gap: 12px; margin-top: 12px; }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #10131a;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+
+  button.btn {
+    width: 100%;
+    margin-top: 16px;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button.btn:hover { background: var(--accent-hover); }
+  button.btn:disabled { background: #33394a; cursor: not-allowed; }
+  button.btn.secondary { background: #3a3f4d; }
+  button.btn.secondary:hover { background: #464c5c; }
+
+  .divider { border-top: 1px solid var(--border); margin: 24px 0; }
+
+  .result {
+    margin-top: 16px;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    display: none;
+    white-space: pre-wrap;
+  }
+  .result.ok { display: block; background: rgba(62, 207, 142, 0.1); border: 1px solid var(--ok); color: var(--ok); }
+  .result.err { display: block; background: rgba(255, 92, 92, 0.1); border: 1px solid var(--err); color: var(--err); }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Importar Setup de Hotel</h1>
+  <!-- <p class="subtitle">Solo administradores maestros (MovNext) pueden crear hoteles nuevos a partir del JSON de setup.</p> -->
+
+  <div class="session-badge" id="sessionBadge">
+    ✅ Sesión activa: <span id="sessionUser"></span>
+    <button id="logoutBtn">Cerrar sesión</button>
+  </div>
+
+  <!-- PASO 1: LOGIN -->
+  <div id="loginSection">
+    <h2 class="section-title">Paso 1 — Iniciar sesión (admin maestro)</h2>
+    <div class="fields">
+      <div>
+        <label for="username">Usuario</label>
+        <input type="text" id="username" placeholder="usuario admin" />
+      </div>
+      <div>
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" />
+      </div>
+    </div>
+    <button class="btn secondary" id="loginBtn">Iniciar Sesión</button>
+    <div class="result" id="loginResult"></div>
+  </div>
+
+  <!-- PASO 2: IMPORT (oculto hasta hacer login) -->
+  <div id="importSection" style="display:none;">
+    <div class="divider"></div>
+    <h2 class="section-title">Paso 2 — Importar setup del hotel</h2>
+
+    <div class="dropzone" id="dropzone">
+      <div id="dropzoneLabel">📄 Arrastra el archivo <b>.json</b> aquí o haz clic para elegirlo</div>
+      <div class="filename" id="filename"></div>
+      <input type="file" id="fileInput" accept="application/json,.json" />
+    </div>
+
+    <div class="fields">
+      <div>
+        <label for="hotelSlugOverride">Slug del hotel (opcional, si quieres forzarlo)</label>
+        <input type="text" id="hotelSlugOverride" placeholder="ej. mi-gran-hotel" />
+      </div>
+      <div>
+        <label for="adminPassword">Password admin del hotel (opcional, default 12345)</label>
+        <input type="text" id="adminPassword" placeholder="12345" />
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="upsert" checked />
+        <label for="upsert" style="margin:0;">Actualizar si el hotel ya existe (upsert)</label>
+      </div>
+    </div>
+
+    <button class="btn" id="importBtn" disabled>Importar Hotel</button>
+    <div class="result" id="importResult"></div>
+  </div>
+</div>
+
+<script>
+  // La API es una sola para todos los hoteles — no se pide al usuario.
+  const API_BASE_URL = 'https://milobify.com';
+
+  // ---- estado de sesión (solo en memoria, se pierde al recargar la página) ----
+  let sessionToken = null;
+
+  const loginSection = document.getElementById('loginSection');
+  const importSection = document.getElementById('importSection');
+  const sessionBadge = document.getElementById('sessionBadge');
+  const sessionUser = document.getElementById('sessionUser');
+  const loginBtn = document.getElementById('loginBtn');
+  const loginResult = document.getElementById('loginResult');
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  function showLoginResult(ok, message) {
+    loginResult.className = 'result ' + (ok ? 'ok' : 'err');
+    loginResult.textContent = message;
+  }
+
+  loginBtn.addEventListener('click', async () => {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!username || !password) {
+      showLoginResult(false, 'Ingresa usuario y password.');
+      return;
+    }
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Iniciando sesión...';
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/hotel-setup/master-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+
+      // MasterAdminAuthService.login devuelve { mensaje: '...' } si falla,
+      // o el documento del usuario (+ accessToken) si tiene éxito.
+      if (!res.ok || data.mensaje || !data.accessToken) {
+        showLoginResult(false, '❌ ' + (data.mensaje || 'No se pudo iniciar sesión.'));
+        return;
+      }
+
+      if (data.rol !== 1 || data.perfil !== 1) {
+        showLoginResult(false, '❌ Este usuario no es administrador maestro (rol y perfil deben ser 1).');
+        return;
+      }
+
+      sessionToken = data.accessToken;
+      sessionUser.textContent = data.username || data.nombre || username;
+      sessionBadge.style.display = 'flex';
+      loginSection.style.display = 'none';
+      importSection.style.display = 'block';
+    } catch (err) {
+      showLoginResult(false, '❌ No se pudo conectar: ' + err.message);
+    } finally {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Iniciar Sesión';
+    }
+  });
+
+  logoutBtn.addEventListener('click', () => {
+    sessionToken = null;
+    sessionBadge.style.display = 'none';
+    loginSection.style.display = 'block';
+    importSection.style.display = 'none';
+    document.getElementById('password').value = '';
+  });
+
+  // ---- dropzone / import ----
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const filenameEl = document.getElementById('filename');
+  const importBtn = document.getElementById('importBtn');
+  const importResult = document.getElementById('importResult');
+
+  let selectedFile = null;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+
+  ['dragenter', 'dragover'].forEach((evt) =>
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    })
+  );
+  ['dragleave', 'drop'].forEach((evt) =>
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+    })
+  );
+  dropzone.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) setFile(file);
+  });
+
+  function setFile(file) {
+    if (!file.name.endsWith('.json')) {
+      showImportResult(false, 'El archivo debe ser un .json');
+      return;
+    }
+    selectedFile = file;
+    filenameEl.textContent = '✔ ' + file.name;
+    importBtn.disabled = false;
+  }
+
+  function showImportResult(ok, message) {
+    importResult.className = 'result ' + (ok ? 'ok' : 'err');
+    importResult.textContent = message;
+  }
+
+  importBtn.addEventListener('click', async () => {
+    if (!selectedFile || !sessionToken) return;
+
+    importBtn.disabled = true;
+    importBtn.textContent = 'Importando...';
+    importResult.className = 'result';
+
+    const hotelSlugOverride = document.getElementById('hotelSlugOverride').value.trim();
+    const adminPassword = document.getElementById('adminPassword').value.trim();
+    const upsert = document.getElementById('upsert').checked;
+
+    const params = new URLSearchParams();
+    if (hotelSlugOverride) params.set('hotelSlugOverride', hotelSlugOverride);
+    if (adminPassword) params.set('adminPassword', adminPassword);
+    params.set('upsert', String(upsert));
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/hotel-setup/import-file?${params.toString()}`, {
+        method: 'POST',
+        headers: {
+          // Sin prefijo "Bearer" — así lo espera MasterAdminGuard
+          Authorization: sessionToken,
+        },
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (res.status === 401 || res.status === 403) {
+        showImportResult(false, '❌ Sesión expirada o sin permisos. Vuelve a iniciar sesión.');
+        logoutBtn.click();
+        return;
+      }
+
+      if (!res.ok) {
+        showImportResult(false, '❌ Error:\n' + JSON.stringify(data, null, 2));
+      } else {
+        showImportResult(true, '✅ ' + data.message + '\n\n' + JSON.stringify(data.summary, null, 2));
+      }ç
+    } catch (err) {
+      showImportResult(false, '❌ No se pudo conectar al endpoint:\n' + err.message);
+    } finally {
+      importBtn.disabled = false;
+      importBtn.textContent = 'Importar Hotel';
+    }
+  });
+</script>
+
+</body>
+</html>
