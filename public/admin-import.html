@@ -344,7 +344,7 @@
         showImportResult(false, '❌ Error:\n' + JSON.stringify(data, null, 2));
       } else {
         showImportResult(true, '✅ ' + data.message + '\n\n' + JSON.stringify(data.summary, null, 2));
-      }ç
+      }
     } catch (err) {
       showImportResult(false, '❌ No se pudo conectar al endpoint:\n' + err.message);
     } finally {
