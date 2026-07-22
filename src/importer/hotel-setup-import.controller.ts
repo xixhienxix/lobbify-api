@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  InternalServerErrorException,
   Post,
   Query,
   UploadedFile,
@@ -75,11 +76,26 @@ export class HotelSetupImportController {
   }
 
   private async runImport(dto: ImportHotelSetupDto) {
-    const summary = await this.importService.importSetup(dto);
-    return {
-      success: true,
-      message: `Hotel "${summary.hotelId}" importado correctamente.`,
-      summary,
-    };
+    try {
+      const summary = await this.importService.importSetup(dto);
+      return {
+        success: true,
+        message: `Hotel "${summary.hotelId}" importado correctamente.`,
+        summary,
+      };
+    } catch (err) {
+      // Log completo en el servidor, con stack trace
+      console.error('❌ hotel-setup import failed:', err);
+
+      // Y también lo regresamos en la respuesta HTTP -- así no hay que
+      // andar buscando en logs cada vez. Es un endpoint interno/admin,
+      // así que es seguro exponer el detalle aquí (quítalo cuando ya
+      // esté estable en producción si te preocupa filtrar detalles).
+      throw new InternalServerErrorException({
+        message: 'Falló el import del setup del hotel.',
+        error: (err as Error)?.message ?? String(err),
+        stack: (err as Error)?.stack,
+      });
+    }
   }
 }

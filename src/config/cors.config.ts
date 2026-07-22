@@ -6,8 +6,9 @@ export const ALLOWED_ORIGINS: (string | RegExp)[] = [
   /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/.*)?$/,
   'https://lobify-front.web.app',
   'https://d3lkfchxk2jil4.cloudfront.net',
-  'https://milobify.com/login',
+  'https://milobify.com',
   'https://app.lobify.mx',
+  'www.milobify.com',
 ];
 
 import { Logger } from '@nestjs/common';
