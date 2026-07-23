@@ -19,8 +19,12 @@
 //   3. Con la conexión del tenant ya abierta, registrar/obtener cada modelo
 //      (Habitaciones, usuarios, Parametros, Tarifas, Estatus, Ama_De_Llaves,
 //      Foliador, codes, Servicios_Adicionales) y hacer los inserts ahí.
-//   4. Todo dentro de una transacción de esa conexión de tenant (si tu Mongo
-//      corre como replica set; si no, ver nota al final).
+//   4. Todo dentro de una transacción de esa conexión de tenant, usando
+//      session.withTransaction() -- maneja reintentos automáticos de commit
+//      en caso de errores transitorios de red con Atlas (en vez del patrón
+//      manual startTransaction/commitTransaction/abortTransaction, que podía
+//      tapar el error real si abortTransaction() fallaba tras un commit que
+//      ya había arrancado).
 
 import {
   BadRequestException,
@@ -120,16 +124,27 @@ export class HotelSetupImportService {
     if (!alreadyExists) {
       // registerHotel() crea el doc en lobbify_admin.hotels Y abre la conexión
       // nueva (que crea la base física en el primer insert que hagamos).
-      await this.tenantService.registerHotel({
-        hotelId: mappedHotel.hotelId,
-        nombre: mappedHotel.nombre,
-        email: mappedHotel.email,
-        password: mappedHotel.password, // ya viene hasheado desde el mapper
-        telefono: mappedHotel.telefono,
-        pais: mappedHotel.pais,
-        checkOut: mappedHotel.checkOut,
-        codigoZona: mappedHotel.codigoZona,
-      });
+      try {
+        await this.tenantService.registerHotel({
+          hotelId: mappedHotel.hotelId,
+          nombre: mappedHotel.nombre,
+          email: mappedHotel.email,
+          password: mappedHotel.password, // ya viene hasheado desde el mapper
+          telefono: mappedHotel.telefono,
+          pais: mappedHotel.pais,
+          checkOut: mappedHotel.checkOut,
+          codigoZona: mappedHotel.codigoZona,
+        });
+      } catch (err: any) {
+        if (err?.code === 11000 && err?.keyPattern?.email) {
+          throw new BadRequestException(
+            `Ya existe OTRO hotel usando el email "${mappedHotel.email}". ` +
+              `Cada hotel necesita un email de administrador distinto — cambia ` +
+              `el email en el JSON de setup, o borra el hotel anterior si era de prueba.`,
+          );
+        }
+        throw err;
+      }
       tenantConnection = await this.tenantService.getConnection(hotelId);
     } else {
       // Hotel ya existe: actualizamos el doc admin a mano (registerHotel no
@@ -218,66 +233,67 @@ export class HotelSetupImportService {
     const mappedCodes = mapCodesDefaults(hotelId);
     const mappedServiciosAdicionales = mapServiciosAdicionalesDefaults(hotelId);
 
-    // 5. Escribir todo dentro de una transacción DE LA CONEXIÓN DEL TENANT.
-    // Requiere que tu Mongo corra como replica set (ver nota al final si no).
+    // 5. Escribir todo dentro de una transacción DE LA CONEXIÓN DEL TENANT,
+    // usando withTransaction() -- maneja automáticamente reintentos de commit
+    // ante errores transitorios de red (UnknownTransactionCommitResult), que
+    // era la causa del falso error "Cannot call abortTransaction after
+    // calling commitTransaction" con el patrón manual anterior.
     const session = await tenantConnection.startSession();
     try {
-      session.startTransaction();
+      await session.withTransaction(async () => {
+        await usuarioModel.findOneAndUpdate(
+          { email: mappedUsuario.email },
+          mappedUsuario,
+          { upsert: true, new: true, session },
+        );
 
-      await usuarioModel.findOneAndUpdate(
-        { email: mappedUsuario.email },
-        mappedUsuario,
-        { upsert: true, new: true, session },
-      );
+        await parametrosModel.findOneAndUpdate(
+          { hotel: hotelId },
+          mappedParametros,
+          { upsert: true, new: true, session },
+        );
 
-      await parametrosModel.findOneAndUpdate(
-        { hotel: hotelId },
-        mappedParametros,
-        {
-          upsert: true,
-          new: true,
+        // Reemplazo total en cada reimport para no duplicar (mismo criterio
+        // en todas las colecciones de catálogo/inventario).
+        await habitacionModel.deleteMany({}, { session });
+        await habitacionModel.insertMany(mappedHabitaciones, { session });
+
+        await tarifasModel.deleteMany({}, { session });
+        await tarifasModel.insertMany(mappedTarifas, { session });
+
+        await estatusModel.deleteMany({}, { session });
+        await estatusModel.insertMany(mappedEstatus, { session });
+
+        await codeModel.deleteMany({}, { session });
+        await codeModel.insertMany(mappedCodes, { session });
+
+        await adicionalModel.deleteMany({}, { session });
+        await adicionalModel.insertMany(mappedServiciosAdicionales, {
           session,
-        },
-      );
+        });
 
-      // Reemplazo total en cada reimport para no duplicar (mismo criterio en
-      // todas las colecciones de catálogo/inventario).
-      await habitacionModel.deleteMany({}, { session });
-      await habitacionModel.insertMany(mappedHabitaciones, { session });
+        const hkCount = await houseKeepingModel
+          .countDocuments()
+          .session(session);
+        if (hkCount === 0) {
+          await houseKeepingModel.insertMany(mappedHouseKeeping, { session });
+        }
 
-      await tarifasModel.deleteMany({}, { session });
-      await tarifasModel.insertMany(mappedTarifas, { session });
-
-      await estatusModel.deleteMany({}, { session });
-      await estatusModel.insertMany(mappedEstatus, { session });
-
-      await codeModel.deleteMany({}, { session });
-      await codeModel.insertMany(mappedCodes, { session });
-
-      await adicionalModel.deleteMany({}, { session });
-      await adicionalModel.insertMany(mappedServiciosAdicionales, { session });
-
-      const hkCount = await houseKeepingModel.countDocuments().session(session);
-      if (hkCount === 0) {
-        await houseKeepingModel.insertMany(mappedHouseKeeping, { session });
-      }
-
-      await foliadorModel.findOneAndUpdate({ hotel: hotelId }, mappedFoliador, {
-        upsert: true,
-        new: true,
-        session,
+        await foliadorModel.findOneAndUpdate(
+          { hotel: hotelId },
+          mappedFoliador,
+          { upsert: true, new: true, session },
+        );
       });
-
-      await session.commitTransaction();
     } catch (err) {
-      await session.abortTransaction();
+      console.error('❌ transacción falló (detalle real):', err);
       throw new InternalServerErrorException(
         `Falló el import del setup del hotel "${hotelId}": ${
           (err as Error).message
         }`,
       );
     } finally {
-      session.endSession();
+      await session.endSession();
     }
 
     return {
@@ -297,17 +313,3 @@ export class HotelSetupImportService {
     };
   }
 }
-
-/**
- * NOTA — transacciones y bases nuevas:
- * Cuando `registerHotel()` abre la conexión de un hotel recién creado, la base
- * física de Mongo todavía no existe (Mongo la crea al primer write). Eso no es
- * problema para `startSession()`/transacciones SIEMPRE que tu servidor Mongo
- * sea un replica set (así sea de un solo nodo) — las transacciones no dependen
- * de que la base ya exista, sino de que el deployment soporte replica set.
- *
- * Si tu Mongo NO corre como replica set: quita `session` de todas las llamadas
- * y acepta que un fallo a medio proceso puede dejar la base del hotel a medias
- * (recomendado en ese caso: si algo falla, hacer `dropDatabase()` de esa
- * conexión de tenant para poder reintentar limpio).
- */
