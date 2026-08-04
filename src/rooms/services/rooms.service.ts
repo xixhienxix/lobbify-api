@@ -82,7 +82,6 @@ export class RoomsService {
             Codigo: body.habitacion.Codigo,
             Numero: body.habitacion.Numero[i],
             Descripcion: body.habitacion.Descripcion,
-            Caracteristicas: body.habitacion.Caracteristicas,
             Tipo: body.habitacion.Tipo,
             Personas: body.habitacion.Personas,
             Adultos: body.habitacion.Adultos,

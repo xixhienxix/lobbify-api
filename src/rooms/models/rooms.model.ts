@@ -34,8 +34,6 @@ export class room {
   @Prop()
   Descripcion: string;
   @Prop()
-  Caracteristicas: string;
-  @Prop()
   Estatus: string;
   @Prop()
   Camas: number;
