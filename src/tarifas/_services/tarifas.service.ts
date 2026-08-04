@@ -93,6 +93,9 @@ export class TarifasService {
       Descuento: body.tarifa.Descuento,
       Visibilidad: body.tarifa.Visibilidad,
       Cancelacion: body.tarifa.Cancelacion,
+      PlanAlimentos: body.tarifa.PlanAlimentos, // <-- add
+      FlexibilidadLogistica: body.tarifa.FlexibilidadLogistica, // <-- add
+      FormaPago: body.tarifa.FormaPago, // <-- add
     });
 
     try {
