@@ -1,12 +1,22 @@
-import { Injectable, Scope, Inject } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  Scope,
+  Inject,
+} from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
-import { Connection, Model } from 'mongoose';
+import { Connection, Model, Types } from 'mongoose';
 import * as jwt from 'jsonwebtoken';
 import { JWTSECRET } from '../../environments/environment';
 import { usuario, UsuarioSchema } from '../models/user.model';
 import { TenantService } from 'src/tenant/tenant.service';
 import { Hotel, HotelSchema } from 'src/admin/models/hotel.model';
+
+// Fields the catalog endpoints never send back to the frontend
+const CAMPOS_PUBLICOS = '-password -passwordHash -accessToken';
+
 @Injectable({ scope: Scope.REQUEST })
 export class UserService {
   constructor(
@@ -22,8 +32,12 @@ export class UserService {
     );
   }
 
+  // ---------------------------------------------------------------------
+  // Existing methods — unchanged
+  // ---------------------------------------------------------------------
+
   async findAll(): Promise<usuario[]> {
-    return this.getModel().find().exec();
+    return this.getModel().find().select(CAMPOS_PUBLICOS).exec();
   }
 
   async findOne(username: string): Promise<usuario> {
@@ -142,5 +156,110 @@ export class UserService {
 
     console.log('❌ No user found across all hotels');
     return { mensaje: 'usuario inexistente' };
+  }
+
+  // ---------------------------------------------------------------------
+  // New CRUD methods — power the Usuarios catalog
+  // ---------------------------------------------------------------------
+
+  async findById(id: string): Promise<usuario> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException(`Id de usuario invalido: ${id}`);
+    }
+
+    const encontrado = await this.getModel()
+      .findById(id)
+      .select(CAMPOS_PUBLICOS)
+      .exec();
+
+    if (!encontrado) {
+      throw new NotFoundException(`Usuario con id ${id} no encontrado`);
+    }
+
+    return encontrado;
+  }
+
+  async create(usuarioData: Partial<usuario>): Promise<usuario> {
+    const model = this.getModel();
+
+    if (!usuarioData.username || !usuarioData.email || !usuarioData.password) {
+      throw new ConflictException('username, email y password son requeridos');
+    }
+
+    const existente = await model
+      .findOne({ username: usuarioData.username })
+      .exec();
+
+    if (existente) {
+      throw new ConflictException(
+        `El nombre de usuario "${usuarioData.username}" ya está en uso`,
+      );
+    }
+
+    const nuevoUsuario = new model({
+      nombre: usuarioData.nombre,
+      email: usuarioData.email,
+      username: usuarioData.username,
+      // stored plain text on purpose, to match the existing login()/autoriza()
+      // comparisons — see the note below if you want to change this
+      password: usuarioData.password,
+      terminos: usuarioData.terminos ?? true,
+      rol: usuarioData.rol ?? 2,
+      perfil: usuarioData.perfil ?? 0,
+      hotel: usuarioData.hotel,
+    });
+
+    const guardado = await nuevoUsuario.save();
+
+    // Re-fetch through the same .select() used elsewhere, rather than
+    // destructuring + casting the saved doc — casting a stripped object to
+    // `usuario` fails to typecheck since password/passwordHash/accessToken
+    // aren't optional on that class.
+    const publico = await model
+      .findById(guardado._id)
+      .select(CAMPOS_PUBLICOS)
+      .exec();
+
+    return publico as usuario;
+  }
+
+  async update(id: string, usuarioData: Partial<usuario>): Promise<usuario> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException(`Id de usuario invalido: ${id}`);
+    }
+
+    // username is the login key used by login()/autoriza() — never patch it
+    // through this endpoint, even if the client sends one
+    const { username, ...actualizable } = usuarioData;
+
+    // Empty/omitted password means "leave unchanged" from the frontend form
+    if (!actualizable.password) {
+      delete actualizable.password;
+    }
+
+    const actualizado = await this.getModel()
+      .findByIdAndUpdate(id, actualizable, { new: true })
+      .select(CAMPOS_PUBLICOS)
+      .exec();
+
+    if (!actualizado) {
+      throw new NotFoundException(`Usuario con id ${id} no encontrado`);
+    }
+
+    return actualizado;
+  }
+
+  async remove(id: string): Promise<{ success: boolean }> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException(`Id de usuario invalido: ${id}`);
+    }
+
+    const eliminado = await this.getModel().findByIdAndDelete(id).exec();
+
+    if (!eliminado) {
+      throw new NotFoundException(`Usuario con id ${id} no encontrado`);
+    }
+
+    return { success: true };
   }
 }
