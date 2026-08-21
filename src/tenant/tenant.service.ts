@@ -30,19 +30,50 @@ export class TenantService implements OnModuleInit {
   }
 
   async getConnection(hotelId: string): Promise<Connection> {
+    console.log('\n========== TENANT CONNECTION DEBUG ==========');
+    console.log('hotelId raw:', hotelId);
+    console.log('hotelId JSON:', JSON.stringify(hotelId));
+    console.log('hotelId length:', hotelId?.length);
+    console.log(
+      'hotelId char codes:',
+      [...hotelId].map((c) => `${c}=${c.charCodeAt(0)}`),
+    );
+
     if (this.connections.has(hotelId)) {
-      return this.connections.get(hotelId);
+      console.log('♻️ Using cached connection for:', hotelId);
+
+      const cached = this.connections.get(hotelId);
+
+      console.log('Cached DB name:', cached?.db?.databaseName);
+      console.log('=============================================\n');
+
+      return cached;
     }
 
     const dbUrl = `${environment.MONGODB_CONNECTION_URL}/${hotelId}?retryWrites=true&w=majority`;
+
+    console.log('Creating connection for hotelId:', hotelId);
+
+    // Don't print full dbUrl because it may contain credentials.
+
     const connection = await createConnection(dbUrl).asPromise();
+
+    console.log('Mongo connected.');
+    console.log('Mongo databaseName:', connection.db?.databaseName);
+    console.log(
+      'Mongo databaseName JSON:',
+      JSON.stringify(connection.db?.databaseName),
+    );
 
     connection.on('error', (err) =>
       console.error(`❌ DB error for hotel ${hotelId}:`, err),
     );
 
     this.connections.set(hotelId, connection);
+
     console.log(`✅ New DB connection for hotel: ${hotelId}`);
+    console.log('=============================================\n');
+
     return connection;
   }
 
