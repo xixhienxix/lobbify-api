@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { createConnection, Connection, Model } from 'mongoose';
 import { environment } from '../environments/environment';
 import { Hotel, HotelSchema } from '../admin/models/hotel.model';
+import { generateHotelPrefix } from './hotel-prefix.utils';
 
 @Injectable()
 export class TenantService implements OnModuleInit {
@@ -102,7 +103,9 @@ export class TenantService implements OnModuleInit {
     const hotelModel = (this.adminConnection.models['hotels'] ||
       this.adminConnection.model('hotels', HotelSchema)) as Model<Hotel>;
 
-    await hotelModel.create(hotelData);
+    const prefix = await generateHotelPrefix(hotelData.nombre, hotelModel);
+    await hotelModel.create({ ...hotelData, prefix });
+
     await this.getConnection(hotelData.hotelId);
 
     console.log(`✅ Hotel registered: ${hotelData.hotelId}`);

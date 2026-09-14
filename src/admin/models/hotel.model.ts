@@ -34,6 +34,15 @@ export class Hotel {
 
   @Prop()
   pais: string;
+
+  @Prop({
+    type: String,
+    required: true,
+    unique: true,
+    uppercase: true,
+    index: true,
+  })
+  prefix: string;
 }
 
 export const HotelSchema = SchemaFactory.createForClass(Hotel);

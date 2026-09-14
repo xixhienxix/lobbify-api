@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Scope, Inject } from '@nestjs/common';
+import { Injectable, Scope, Inject } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
 import { Connection, Model } from 'mongoose';

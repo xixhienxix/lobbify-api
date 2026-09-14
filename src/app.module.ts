@@ -30,10 +30,12 @@ import { TenantModule } from './tenant/tenant.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { AdminModule } from './admin/admin.module';
 import { HotelSetupImportModule } from './importer/hotel-setup-import.module';
+import { ReservationsModule } from './reservations/reservations.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    ReservationsModule,
     ScheduleModule,
     HotelSetupImportModule,
     AuthModule,

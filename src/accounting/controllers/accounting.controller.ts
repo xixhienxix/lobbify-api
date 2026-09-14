@@ -10,15 +10,24 @@ import {
 } from '@nestjs/common';
 import { RolesUserGuard } from 'src/guards/roles.user.guard';
 import { AccountingService } from '../services/accounting.service';
-
+import { GuestStatementService } from 'src/reservations/guest.statement.service';
 @Controller()
 export class AccountingController {
-  constructor(private _AccountingService: AccountingService) {}
+  constructor(
+    private _AccountingService: AccountingService,
+    private _guestServiceStatement: GuestStatementService,
+  ) {}
 
   @Get('/edo_cuenta/:folio')
   @UseGuards(RolesUserGuard)
   async getAccounts(@Param('folio') folio: string): Promise<any> {
     return this._AccountingService.getAccounts(folio);
+  }
+
+  @Get('/edo_cuenta/statement/:folio')
+  @UseGuards(RolesUserGuard)
+  async getStatement(@Param('folio') folio: string): Promise<any> {
+    return this._guestServiceStatement.getStatement(folio);
   }
 
   @Get('/ingresos/range')

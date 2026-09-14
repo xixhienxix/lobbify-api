@@ -126,7 +126,6 @@ export class UserService {
       const userModel = (tenantConnection.models['usuarios'] ||
         tenantConnection.model('usuarios', UsuarioSchema)) as Model<usuario>;
 
-      // Check all users in this hotel's DB
       const allUsers = await userModel.find().lean();
       console.log(
         `   Users in ${hotel.hotelId}:`,
@@ -150,6 +149,13 @@ export class UserService {
           { expiresIn: '30m' },
         );
         user.accessToken = authJwtToken;
+
+        // New: surface the hotel's admin-registry info alongside the user,
+        // so the frontend can build guest-facing reservation codes
+        // (prefix + folio) without a second round-trip.
+        user.hotelId = hotel.hotelId;
+        user.hotelPrefix = hotel.prefix;
+
         return user;
       }
     }

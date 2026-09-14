@@ -10,10 +10,14 @@ import {
 import { RolesUserGuard } from 'src/guards/roles.user.guard';
 import { GuestService } from '../services/guest.service';
 import { FilterReservationsDto } from '../models/guest.model';
+import { ReservationAuthService } from '../../reservations/reservation-auth.service';
 
 @Controller()
 export class GuestsController {
-  constructor(private _GuestService: GuestService) {}
+  constructor(
+    private _GuestService: GuestService,
+    private _reservationAuthService: ReservationAuthService,
+  ) {}
 
   @Get('/huesped/getAll')
   @UseGuards(RolesUserGuard)

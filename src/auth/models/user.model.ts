@@ -25,6 +25,19 @@ export class usuario {
   hotel: string;
   @Prop()
   accessToken: string;
+  @Prop({
+    type: String,
+    required: true,
+    unique: true,
+    uppercase: true,
+    index: true,
+  })
+  hotelPrefix: string;
+  @Prop({
+    type: String,
+    unique: true,
+  })
+  hotelId: string;
 }
 
 export const UsuarioSchema = SchemaFactory.createForClass(usuario);
