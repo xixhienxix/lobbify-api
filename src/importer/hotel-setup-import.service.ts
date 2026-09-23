@@ -21,10 +21,11 @@
 //      Foliador, codes, Servicios_Adicionales) y hacer los inserts ahí.
 //   4. Todo dentro de una transacción de esa conexión de tenant, usando
 //      session.withTransaction() -- maneja reintentos automáticos de commit
-//      en caso de errores transitorios de red con Atlas (en vez del patrón
-//      manual startTransaction/commitTransaction/abortTransaction, que podía
-//      tapar el error real si abortTransaction() fallaba tras un commit que
-//      ya había arrancado).
+//      en caso de errores transitorios de red con Atlas.
+//   5. El summary devuelto incluye `roomTypes` (Codigo únicos) para que el
+//      panel de import pueda ofrecer subir una foto de portada por tipo de
+//      cuarto justo después de importar (ver hotel-setup-import.controller.ts
+//      y admin-import.html).
 
 import {
   BadRequestException,
@@ -93,6 +94,10 @@ export interface ImportSummary {
     codes: number;
     serviciosAdicionales: number;
   };
+  // Tipos de cuarto únicos (por Codigo) creados en este import, para que el
+  // panel pueda ofrecer subir una foto de portada por cada tipo justo
+  // después de importar, sin tener que re-parsear el JSON en el cliente.
+  roomTypes: { codigo: string; tipo: string; descripcion: string }[];
 }
 
 @Injectable()
@@ -233,11 +238,25 @@ export class HotelSetupImportService {
     const mappedCodes = mapCodesDefaults(hotelId);
     const mappedServiciosAdicionales = mapServiciosAdicionalesDefaults(hotelId);
 
+    // Tipos de cuarto únicos (por Codigo), para el paso 3 de imágenes.
+    const roomTypesMap = new Map<
+      string,
+      { codigo: string; tipo: string; descripcion: string }
+    >();
+    for (const h of mappedHabitaciones) {
+      if (!roomTypesMap.has(h.Codigo)) {
+        roomTypesMap.set(h.Codigo, {
+          codigo: h.Codigo,
+          tipo: h.Tipo,
+          descripcion: h.Descripcion,
+        });
+      }
+    }
+    const roomTypes = Array.from(roomTypesMap.values());
+
     // 5. Escribir todo dentro de una transacción DE LA CONEXIÓN DEL TENANT,
     // usando withTransaction() -- maneja automáticamente reintentos de commit
-    // ante errores transitorios de red (UnknownTransactionCommitResult), que
-    // era la causa del falso error "Cannot call abortTransaction after
-    // calling commitTransaction" con el patrón manual anterior.
+    // ante errores transitorios de red (UnknownTransactionCommitResult).
     const session = await tenantConnection.startSession();
     try {
       await session.withTransaction(async () => {
@@ -310,6 +329,7 @@ export class HotelSetupImportService {
         codes: mappedCodes.length,
         serviciosAdicionales: mappedServiciosAdicionales.length,
       },
+      roomTypes,
     };
   }
 }

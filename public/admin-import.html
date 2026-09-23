@@ -20,11 +20,12 @@
     margin: 0;
     min-height: 100vh;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     background: var(--bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 40px 16px;
   }
   .card {
     width: 100%;
@@ -110,6 +111,12 @@
   button.btn:disabled { background: #33394a; cursor: not-allowed; }
   button.btn.secondary { background: #3a3f4d; }
   button.btn.secondary:hover { background: #464c5c; }
+  button.btn.small {
+    width: auto;
+    margin-top: 0;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
 
   .divider { border-top: 1px solid var(--border); margin: 24px 0; }
 
@@ -123,13 +130,44 @@
   }
   .result.ok { display: block; background: rgba(62, 207, 142, 0.1); border: 1px solid var(--ok); color: var(--ok); }
   .result.err { display: block; background: rgba(255, 92, 92, 0.1); border: 1px solid var(--err); color: var(--err); }
+
+  /* --- Paso 3: tarjetas de tipos de cuarto --- */
+  .room-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .room-card .thumb {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    background: #10131a;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+    object-fit: cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: var(--muted);
+  }
+  .room-card .info { flex: 1; min-width: 0; }
+  .room-card .info .codigo { font-weight: 600; font-size: 14px; }
+  .room-card .info .tipo { font-size: 12px; color: var(--muted); }
+  .room-card .status { font-size: 12px; margin-top: 4px; }
+  .room-card .status.ok { color: var(--ok); }
+  .room-card .status.err { color: var(--err); }
+  .room-card input[type="file"] { display: none; }
 </style>
 </head>
 <body>
 
 <div class="card">
   <h1>Importar Setup de Hotel</h1>
-  <!-- <p class="subtitle">Solo administradores maestros (MovNext) pueden crear hoteles nuevos a partir del JSON de setup.</p> -->
 
   <div class="session-badge" id="sessionBadge">
     ✅ Sesión activa: <span id="sessionUser"></span>
@@ -182,17 +220,35 @@
     <button class="btn" id="importBtn" disabled>Importar Hotel</button>
     <div class="result" id="importResult"></div>
   </div>
+
+  <!-- PASO 3: IMÁGENES POR TIPO DE CUARTO (oculto hasta importar con éxito) -->
+  <div id="imagesSection" style="display:none;">
+    <div class="divider"></div>
+    <h2 class="section-title">Paso 3 — Foto de portada por tipo de cuarto</h2>
+    <p class="subtitle" style="margin-bottom:16px;">
+      Sube el <b>ZIP</b> de fotos que descargaste de la página de preparación
+      (portada + galería, ya en .webp) para cada tipo de cuarto — también
+      puedes subir una sola imagen suelta si lo prefieres. Se procesa con el
+      mismo flujo que usa el panel del hotel (presign → sube a S3 → confirma).
+    </p>
+    <div id="roomCardsContainer"></div>
+  </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
   // La API es una sola para todos los hoteles — no se pide al usuario.
   const API_BASE_URL = 'https://milobify.com';
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+  const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB, igual que el backend
 
   // ---- estado de sesión (solo en memoria, se pierde al recargar la página) ----
   let sessionToken = null;
+  let currentHotelId = null; // se llena tras un import exitoso, lo usan las subidas de imagen
 
   const loginSection = document.getElementById('loginSection');
   const importSection = document.getElementById('importSection');
+  const imagesSection = document.getElementById('imagesSection');
   const sessionBadge = document.getElementById('sessionBadge');
   const sessionUser = document.getElementById('sessionUser');
   const loginBtn = document.getElementById('loginBtn');
@@ -224,8 +280,6 @@
       });
       const data = await res.json();
 
-      // MasterAdminAuthService.login devuelve { mensaje: '...' } si falla,
-      // o el documento del usuario (+ accessToken) si tiene éxito.
       if (!res.ok || data.mensaje || !data.accessToken) {
         showLoginResult(false, '❌ ' + (data.mensaje || 'No se pudo iniciar sesión.'));
         return;
@@ -251,13 +305,15 @@
 
   logoutBtn.addEventListener('click', () => {
     sessionToken = null;
+    currentHotelId = null;
     sessionBadge.style.display = 'none';
     loginSection.style.display = 'block';
     importSection.style.display = 'none';
+    imagesSection.style.display = 'none';
     document.getElementById('password').value = '';
   });
 
-  // ---- dropzone / import ----
+  // ---- dropzone / import (Paso 2) ----
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
   const filenameEl = document.getElementById('filename');
@@ -310,6 +366,7 @@
     importBtn.disabled = true;
     importBtn.textContent = 'Importando...';
     importResult.className = 'result';
+    imagesSection.style.display = 'none';
 
     const hotelSlugOverride = document.getElementById('hotelSlugOverride').value.trim();
     const adminPassword = document.getElementById('adminPassword').value.trim();
@@ -344,6 +401,8 @@
         showImportResult(false, '❌ Error:\n' + JSON.stringify(data, null, 2));
       } else {
         showImportResult(true, '✅ ' + data.message + '\n\n' + JSON.stringify(data.summary, null, 2));
+        currentHotelId = data.summary.hotelId;
+        renderRoomImageCards(data.summary.roomTypes || []);
       }
     } catch (err) {
       showImportResult(false, '❌ No se pudo conectar al endpoint:\n' + err.message);
@@ -352,6 +411,215 @@
       importBtn.textContent = 'Importar Hotel';
     }
   });
+
+  // ---- Paso 3: imágenes por tipo de cuarto ----
+  // Mismo flujo de 3 pasos que RoomImageService (frontend Angular):
+  //   1. POST /rooms/:codigo/images/presign  -> { uploadUrl, key, finalUrl }
+  //   2. PUT directo a `uploadUrl` (sin Content-Type, igual que el service real)
+  //   3. POST /rooms/:codigo/images/confirm  -> { key, isCover }
+  //
+  // Estos endpoints resuelven la conexión del hotel vía el header `x-hotel-id`
+  // (TenantMiddleware), no vía el JWT del admin maestro -- por eso se manda
+  // ese header aquí en vez de/además del Authorization.
+
+  const roomCardsContainer = document.getElementById('roomCardsContainer');
+
+  function renderRoomImageCards(roomTypes) {
+    roomCardsContainer.innerHTML = '';
+
+    if (!roomTypes.length) {
+      imagesSection.style.display = 'none';
+      return;
+    }
+
+    roomTypes.forEach((rt) => {
+      const card = document.createElement('div');
+      card.className = 'room-card';
+      card.innerHTML = `
+        <div class="thumb" id="thumb-${rt.codigo}">🏨</div>
+        <div class="info">
+          <div class="codigo">${rt.codigo}</div>
+          <div class="tipo">${rt.tipo || ''} ${rt.descripcion ? '· ' + rt.descripcion : ''}</div>
+          <div class="status" id="status-${rt.codigo}"></div>
+        </div>
+        <button class="btn small secondary" id="btn-${rt.codigo}">Subir ZIP / imagen</button>
+        <input type="file" id="file-${rt.codigo}" accept=".zip,application/zip,image/jpeg,image/png,image/webp" />
+      `;
+      roomCardsContainer.appendChild(card);
+
+      const btn = card.querySelector(`#btn-${cssEscape(rt.codigo)}`);
+      const input = card.querySelector(`#file-${cssEscape(rt.codigo)}`);
+
+      btn.addEventListener('click', () => input.click());
+      input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const isZip =
+          file.name.toLowerCase().endsWith('.zip') ||
+          file.type === 'application/zip' ||
+          file.type === 'application/x-zip-compressed';
+
+        if (isZip) {
+          processRoomZip(rt.codigo, file);
+        } else {
+          uploadOneImage(rt.codigo, file, true, '1/1');
+        }
+      });
+    });
+
+    imagesSection.style.display = 'block';
+  }
+
+  // querySelector con # no acepta ciertos caracteres en el id tal cual; los
+  // Codigo de este proyecto son slugs simples (A-Z, 0-9, guiones) así que en
+  // la práctica esto no truena, pero por si acaso escapamos.
+  function cssEscape(value) {
+    return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+  }
+
+  // Extrae el índice numérico del nombre de archivo (...-0-portada-xxx.webp,
+  // ...-1-xxx.webp, etc). Si no encuentra un número, lo manda al final.
+  function extractImageIndex(filename) {
+    const match = filename.match(/-(\d+)-/);
+    return match ? parseInt(match[1], 10) : 999;
+  }
+
+  function mimeFromExtension(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    if (ext === 'webp') return 'image/webp';
+    if (ext === 'png') return 'image/png';
+    if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+    return 'application/octet-stream';
+  }
+
+  // Descomprime el ZIP de un tipo de cuarto (portada + galería, ya en .webp
+  // tal como los genera la página de preparación) y sube cada imagen en
+  // orden, marcando como portada (isCover:true) la que trae "portada" en el
+  // nombre -- o, si ninguna la trae, la de índice más bajo.
+  async function processRoomZip(codigo, zipFile) {
+    const statusEl = document.getElementById(`status-${codigo}`);
+    const btn = document.getElementById(`btn-${codigo}`);
+    btn.disabled = true;
+
+    try {
+      statusEl.className = 'status';
+      statusEl.textContent = '⏳ Descomprimiendo ZIP...';
+
+      const zip = await JSZip.loadAsync(zipFile);
+      const entries = Object.values(zip.files).filter(
+        (f) => !f.dir && /\.(webp|jpe?g|png)$/i.test(f.name),
+      );
+
+      if (!entries.length) {
+        throw new Error('El ZIP no contiene imágenes .webp/.jpg/.png');
+      }
+
+      entries.sort((a, b) => extractImageIndex(a.name) - extractImageIndex(b.name));
+
+      const hasExplicitCover = entries.some((e) =>
+        e.name.toLowerCase().includes('portada'),
+      );
+
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        const blob = await entry.async('blob');
+        const baseName = entry.name.split('/').pop();
+        const mime = mimeFromExtension(baseName);
+        const file = new File([blob], baseName, { type: mime });
+
+        const isCover = hasExplicitCover
+          ? entry.name.toLowerCase().includes('portada')
+          : i === 0;
+
+        await uploadOneImage(codigo, file, isCover, `${i + 1}/${entries.length}`);
+      }
+
+      statusEl.className = 'status ok';
+      statusEl.textContent = `✅ ${entries.length} imagen(es) subida(s)`;
+    } catch (err) {
+      statusEl.className = 'status err';
+      statusEl.textContent = '❌ ' + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Cambiar imágenes';
+    }
+  }
+
+  // ---- Paso 3: subida de UNA imagen ----
+  // Mismo flujo de 3 pasos que RoomImageService (frontend Angular):
+  //   1. POST /rooms/:codigo/images/presign  -> { uploadUrl, key, finalUrl }
+  //   2. PUT directo a `uploadUrl` (sin Content-Type, igual que el service real)
+  //   3. POST /rooms/:codigo/images/confirm  -> { key, isCover }
+  //
+  // Estos endpoints resuelven la conexión del hotel vía el header `x-hotel-id`
+  // (TenantMiddleware), no vía el JWT del admin maestro -- por eso se manda
+  // ese header aquí en vez de/además del Authorization.
+  async function uploadOneImage(codigo, file, isCover, progressLabel) {
+    const statusEl = document.getElementById(`status-${codigo}`);
+    const thumbEl = document.getElementById(`thumb-${codigo}`);
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      throw new Error(`Tipo no permitido (${file.name}): solo JPEG/PNG/WEBP`);
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      throw new Error(`${file.name} es muy grande (máx. 10MB)`);
+    }
+
+    statusEl.className = 'status';
+    statusEl.textContent = `⏳ [${progressLabel}] Solicitando URL de subida...`;
+
+    // 1. presign
+    const presignRes = await fetch(`${API_BASE_URL}/rooms/${codigo}/images/presign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-hotel-id': currentHotelId,
+        Authorization: sessionToken,
+      },
+      body: JSON.stringify({ fileType: file.type, fileSize: file.size }),
+    });
+    const presignData = await presignRes.json();
+    if (!presignRes.ok) {
+      throw new Error(presignData.message || 'Falló el presign');
+    }
+
+    // 2. PUT directo a S3 (igual que RoomImageService: sin Content-Type)
+    statusEl.textContent = `⏳ [${progressLabel}] Subiendo a S3...`;
+    const s3Res = await fetch(presignData.uploadUrl, {
+      method: 'PUT',
+      body: file,
+    });
+    if (!s3Res.ok) {
+      throw new Error(`S3 PUT falló: ${s3Res.status} ${s3Res.statusText}`);
+    }
+
+    // 3. confirm
+    statusEl.textContent = `⏳ [${progressLabel}] Confirmando...`;
+    const confirmRes = await fetch(`${API_BASE_URL}/rooms/${codigo}/images/confirm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-hotel-id': currentHotelId,
+        Authorization: sessionToken,
+      },
+      body: JSON.stringify({ key: presignData.key, isCover }),
+    });
+    const confirmData = await confirmRes.json();
+    if (!confirmRes.ok) {
+      throw new Error(confirmData.message || 'Falló el confirm');
+    }
+
+    // Actualiza el thumbnail de la tarjeta con la portada más reciente subida.
+    if (isCover) {
+      thumbEl.innerHTML = '';
+      thumbEl.style.backgroundImage = `url("${presignData.finalUrl}")`;
+      thumbEl.style.backgroundSize = 'cover';
+      thumbEl.style.backgroundPosition = 'center';
+    }
+
+    return confirmData;
+  }
 </script>
 
 </body>

@@ -11,7 +11,6 @@ import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
 import { Connection, Model } from 'mongoose';
 import { Parametros, ParametrosSchema } from '../models/parametros.model';
-import { ADMIN_FIELDS } from 'src/constraints/admin-fields-constraints';
 import { HotelSchedulerService } from 'src/scheduler/scheduler.tasks';
 
 @Injectable({ scope: Scope.REQUEST })
@@ -113,6 +112,48 @@ export class ParametrosService {
     } catch (err) {
       console.log(err);
       return err;
+    }
+  }
+
+  async getPublicParametros(): Promise<Partial<Parametros>> {
+    try {
+      const data = await this.parametrosModel
+        .findOne()
+        .select({
+          checkOut: 1,
+          checkIn: 1,
+          divisa: 1,
+          zona: 1,
+          codigoZona: 1,
+          hotel: 1,
+          wifi: 1,
+          wifiPass: 1,
+          infoAdicional: 1,
+          urlMapa: 1,
+          paginaWeb: 1,
+          whatsapp: 1,
+        })
+        .lean()
+        .exec();
+
+      if (!data) {
+        throw new NotFoundException('No parametros found');
+      }
+
+      return data;
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Database error fetching public parametros: ${error.message}`,
+        error.stack,
+      );
+
+      throw new InternalServerErrorException(
+        'Failed to fetch public hotel configuration',
+      );
     }
   }
 }

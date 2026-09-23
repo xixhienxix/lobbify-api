@@ -18,7 +18,7 @@ export class ParametrosController {
 
   @Get('/parametros/public')
   async getParametrosPublic(): Promise<any> {
-    return this._parametrosService.getAllWithoutRole();
+    return this._parametrosService.getPublicParametros();
   }
 
   @Post('/parametros/save')
