@@ -6,12 +6,14 @@ import {
   Param,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common';
-
-import { usuario } from './models/user.model';
 import { UserService } from './service/user.service';
+import { usuario } from './models/user.model';
+import { AdminVerifiedGuard } from 'src/guards/admin-verified.guard';
 
 @Controller('usuarios')
+@UseGuards(AdminVerifiedGuard)
 export class UsersController {
   constructor(private readonly userService: UserService) {}
 

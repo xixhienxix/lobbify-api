@@ -90,11 +90,9 @@ export class UserService {
 
     if (!user) return { mensaje: 'usuario inexistente' };
 
-    const authJwtToken = jwt.sign(
-      { usuariosResultQuery: user }, // 👈 same fix
-      JWTSECRET,
-      { expiresIn: '30m' },
-    );
+    const authJwtToken = jwt.sign({ usuariosResultQuery: user }, JWTSECRET, {
+      expiresIn: '30m',
+    });
     user.accessToken = authJwtToken;
     return user;
   }
@@ -103,65 +101,55 @@ export class UserService {
     username: string,
     plainTextPassword: string,
   ): Promise<any> {
-    console.log('🔐 loginFromAdmin called');
-    console.log('   username:', username);
-    console.log('   password:', plainTextPassword);
-
     const adminConnection: Connection = this.tenantService.getAdminConnection();
+
     const HotelModel = (adminConnection.models['hotels'] ||
       adminConnection.model('hotels', HotelSchema)) as Model<Hotel>;
 
-    const hotels = await HotelModel.find({ status: 'active' }).lean();
-    console.log(
-      `🏨 Found ${hotels.length} active hotels:`,
-      hotels.map((h) => h.hotelId),
-    );
+    const hotels = await HotelModel.find({
+      status: 'active',
+    }).lean();
 
     for (const hotel of hotels) {
-      console.log(`\n🔍 Searching in hotel: ${hotel.hotelId}`);
-
       const tenantConnection = await this.tenantService.getConnection(
         hotel.hotelId,
       );
+
       const userModel = (tenantConnection.models['usuarios'] ||
         tenantConnection.model('usuarios', UsuarioSchema)) as Model<usuario>;
 
-      const allUsers = await userModel.find().lean();
-      console.log(
-        `   Users in ${hotel.hotelId}:`,
-        allUsers.map((u) => ({
-          username: u.username,
-          password: u.password,
-          hotel: u.hotel,
-        })),
-      );
-
       const user = await userModel
-        .findOne({ username, password: plainTextPassword })
+        .findOne({
+          username,
+          password: plainTextPassword,
+        })
         .lean();
 
-      console.log(`   Match found:`, !!user);
-
       if (user) {
-        const authJwtToken = jwt.sign(
-          { usuariosResultQuery: user },
-          JWTSECRET,
-          { expiresIn: '30m' },
-        );
-        user.accessToken = authJwtToken;
-
-        // New: surface the hotel's admin-registry info alongside the user,
-        // so the frontend can build guest-facing reservation codes
-        // (prefix + folio) without a second round-trip.
+        // IMPORTANT:
+        // Add tenant information BEFORE signing the JWT.
         user.hotelId = hotel.hotelId;
         user.hotelPrefix = hotel.prefix;
+
+        const authJwtToken = jwt.sign(
+          {
+            usuariosResultQuery: user,
+          },
+          JWTSECRET,
+          {
+            expiresIn: '30m',
+          },
+        );
+
+        user.accessToken = authJwtToken;
 
         return user;
       }
     }
 
-    console.log('❌ No user found across all hotels');
-    return { mensaje: 'usuario inexistente' };
+    return {
+      mensaje: 'usuario inexistente',
+    };
   }
 
   // ---------------------------------------------------------------------
@@ -192,6 +180,26 @@ export class UserService {
       throw new ConflictException('username, email y password son requeridos');
     }
 
+    // hotelPrefix/hotelId come from the VERIFIED token that AdminVerifiedGuard
+    // attached to the request — never from usuarioData, which is
+    // client-supplied and could be tampered with. If the currently logged-in
+    // admin's own record doesn't have hotelPrefix yet (pre-dates this
+    // feature), this correctly fails rather than silently trusting the body.
+    const usuarioAutenticado = (this.request as any).usuarioAutenticado as
+      | { hotel?: string; hotelId?: string; hotelPrefix?: string }
+      | undefined;
+
+    const hotelPrefix = usuarioAutenticado?.hotelPrefix;
+    const hotelId = usuarioAutenticado?.hotelId;
+    const hotel = usuarioAutenticado?.hotel;
+
+    if (!hotelPrefix) {
+      throw new ConflictException(
+        'El administrador autenticado no tiene hotelPrefix asignado. ' +
+          'Actualiza su registro y vuelve a iniciar sesión antes de crear usuarios.',
+      );
+    }
+
     const existente = await model
       .findOne({ username: usuarioData.username })
       .exec();
@@ -212,15 +220,13 @@ export class UserService {
       terminos: usuarioData.terminos ?? true,
       rol: usuarioData.rol ?? 2,
       perfil: usuarioData.perfil ?? 0,
-      hotel: usuarioData.hotel,
+      hotel,
+      hotelPrefix,
+      hotelId,
     });
 
     const guardado = await nuevoUsuario.save();
 
-    // Re-fetch through the same .select() used elsewhere, rather than
-    // destructuring + casting the saved doc — casting a stripped object to
-    // `usuario` fails to typecheck since password/passwordHash/accessToken
-    // aren't optional on that class.
     const publico = await model
       .findById(guardado._id)
       .select(CAMPOS_PUBLICOS)

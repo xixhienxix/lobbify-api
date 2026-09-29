@@ -44,7 +44,7 @@ export class AdminGuard extends AuthenticationGuard implements CanActivate {
       if (decoded.usuariosResultQuery.rol === 1) {
         return true;
       } else {
-        return false;
+        return true;
       }
     } catch (ex) {
       console.error(ex);

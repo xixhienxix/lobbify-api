@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "start:build": "sudo npm run build && sudo npm run start",
+    "start:build": "npm run build && sudo npm run start",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start:nest": "nest start",
     "start": "node dist/main.js",

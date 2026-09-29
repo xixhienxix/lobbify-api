@@ -32,10 +32,22 @@ export class usuario {
     uppercase: true,
     index: true,
   })
-  hotelPrefix: string;
+  // Denormalized from the admin-registry Hotel document at login time
+  // (see UserService.loginFromAdmin). Every user under the same hotel
+  // shares the same value — it identifies the hotel, not the user — so
+  // it must NOT be unique at this collection's level. Uniqueness for
+  // hotelId/prefix is already enforced on the Hotel schema itself.
   @Prop({
     type: String,
-    unique: true,
+    required: true,
+    uppercase: true,
+    index: true,
+  })
+  hotelPrefix: string;
+
+  @Prop({
+    type: String,
+    index: true,
   })
   hotelId: string;
 }

@@ -3,50 +3,69 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { Observable } from 'rxjs';
-import { jwtDecode } from 'jwt-decode';
 import { ConfigService } from '@nestjs/config';
-import { INTERNAL_APP_SECRET } from 'src/environments/environment';
+import * as jwt from 'jsonwebtoken';
+
+import { INTERNAL_APP_SECRET, JWTSECRET } from 'src/environments/environment';
+
+type UserPayload = {
+  _id: string;
+  email: string;
+  hotel: string;
+  hotelId?: string;
+  hotelPrefix?: string;
+  nombre: string;
+  rol: number;
+  terminos: boolean;
+  username: string;
+};
+
 type TokenPayload = {
   exp: number;
   iat: number;
   usuariosResultQuery: UserPayload;
 };
-type UserPayload = {
-  _id: string;
-  email: string;
-  hotel: string;
-  nombre: string;
-  password: string;
-  rol: string;
-  terminos: boolean;
-  username: string;
-};
+
 @Injectable()
 export class RolesUserGuard implements CanActivate {
   constructor(private config: ConfigService) {}
 
-  canActivate(context: ExecutionContext) {
+  canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest();
 
-    const header =
+    const internalHeader =
       req.headers['x-internal-access'] || req.headers['X-Internal-Access'];
 
-    if (header === INTERNAL_APP_SECRET) {
+    if (internalHeader === INTERNAL_APP_SECRET) {
       return true;
     }
 
     const authJwtToken = req.headers['authorization'];
-    if (!authJwtToken) throw new UnauthorizedException();
+
+    if (!authJwtToken) {
+      throw new UnauthorizedException('Falta el header Authorization.');
+    }
 
     try {
-      const decoded = jwtDecode(authJwtToken) as any;
-      const role = decoded?.usuariosResultQuery?.rol;
-      return role === 1 || role === 2;
-    } catch {
-      throw new UnauthorizedException();
+      const decoded = jwt.verify(authJwtToken, JWTSECRET) as TokenPayload;
+
+      const role = Number(decoded?.usuariosResultQuery?.rol);
+
+      if (![1, 2, 3].includes(role)) {
+        throw new ForbiddenException(
+          'El usuario no tiene acceso a este recurso.',
+        );
+      }
+
+      return true;
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+
+      throw new UnauthorizedException('Token inválido o expirado.');
     }
   }
 }

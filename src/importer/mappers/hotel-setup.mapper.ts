@@ -331,22 +331,83 @@ export function mapHabitaciones(
   return result;
 }
 
-// --- Tarifas (una tarifa rack base por tipo de cuarto) ----------------------
+// --- Tarifas (una "Tarifa Base" por tipo de cuarto) -------------------------
+//
+// FIX IMPORTANTE (bug reportado): el frontend (TarifasService.getAll()) filtra
+// TODAS las tarifas que llegan del API así:
+//
+//   responseObj.filter(obj =>
+//     obj.Visibilidad?.subTask?.some(x => x.name === 'Recepción' && x.value === true)
+//   )
+//
+// Si `Visibilidad` no viene seteado (como antes), TODAS las tarifas quedan
+// filtradas fuera y la tabla se ve vacía -- aunque los documentos SÍ existan
+// en Mongo. Además:
+//   - El tab "Tarifa Base" del componente filtra por match EXACTO:
+//     `val.Tarifa === 'Tarifa Base'` -- debe ser ese literal, no un nombre
+//     custom como "Tarifa Rack - X".
+//   - `tarifasActivas()` en el componente hace `element.TarifasActivas.map(...)`
+//     sin protección -- si es `undefined` truena. Debe venir como `[]` mínimo.
+//   - `politicasTable()` hace `row.Politicas?.filter(...)` -- Politicas debe
+//     ser un ARREGLO de {name, value}, no un objeto `{}`.
+//
+// Este mapper ahora arma cada Tarifa con la forma exacta que el frontend
+// necesita para renderizar y editar correctamente.
+
+export interface MappedTarifaVisibilidadSubTask {
+  name: string;
+  value: boolean;
+}
+
+export interface MappedTarifaVisibilidad {
+  name: string;
+  value: boolean;
+  subTask: MappedTarifaVisibilidadSubTask[];
+}
+
+export interface MappedTarifaPolitica {
+  name: string;
+  value: boolean;
+}
 
 export interface MappedTarifa {
-  Tarifa: string;
+  Tarifa: string; // literal 'Tarifa Base' -- así lo espera el tab del front
   Habitacion: string[];
   Plan: string;
-  Politicas: any;
+  Politicas: MappedTarifaPolitica[]; // arreglo, no objeto
   EstanciaMinima: number;
   EstanciaMaxima: number;
   TarifaRack: number;
   Estado: boolean;
+  Dias: string[]; // el schema lo tiene, el front no lo usa para 'Tarifa Base' pero lo espera presente
+  TarifasActivas: any[]; // CRÍTICO: sin esto, el front truena al intentar .map()
+  Visibilidad: MappedTarifaVisibilidad; // CRÍTICO: sin esto, el filtro del front descarta todo
   Cancelacion: any;
   Adultos: number;
   Ninos: number;
   Descuento: number;
   hotel: string;
+  FormaPago: any[];
+}
+
+function defaultVisibilidad(): MappedTarifaVisibilidad {
+  return {
+    name: 'Visibility Rates',
+    value: true,
+    subTask: [
+      { name: 'Recepción', value: true },
+      { name: 'Motor de Reservas', value: false },
+      { name: 'Channel Manager OTAs', value: false },
+    ],
+  };
+}
+
+function defaultPoliticas(): MappedTarifaPolitica[] {
+  return [
+    { name: 'Gratis', value: false },
+    { name: 'No Reembolsable', value: true },
+    { name: 'Reembolsable Parcial', value: false },
+  ];
 }
 
 export function mapTarifas(
@@ -357,14 +418,17 @@ export function mapTarifas(
   const cancelPolicy = json.base_rate_policy ?? {};
 
   return rooms.map((room) => ({
-    Tarifa: `Tarifa Rack - ${room.public_name ?? deriveCodigo(room)}`,
+    Tarifa: 'Tarifa Base', // <-- FIX: literal, no "Tarifa Rack - X"
     Habitacion: [deriveCodigo(room)],
     Plan: 'Solo Hospedaje',
-    Politicas: {},
+    Politicas: defaultPoliticas(), // <-- FIX: arreglo, no {}
     EstanciaMinima: 1,
     EstanciaMaxima: 0,
     TarifaRack: toNumber(room.base_rate),
     Estado: true,
+    Dias: [], // <-- FIX: presente aunque vacío
+    TarifasActivas: [], // <-- FIX: CRÍTICO, evita el crash de .map() en el front
+    Visibilidad: defaultVisibilidad(), // <-- FIX: CRÍTICO, sin esto el front filtra todo fuera
     Cancelacion: {
       tipo: cancelPolicy.cancel_policy_type ?? '',
       limiteHoras: toNumber(cancelPolicy.cancel_limit_hours),
@@ -377,6 +441,7 @@ export function mapTarifas(
     Ninos: 0,
     Descuento: 0,
     hotel: hotelId,
+    FormaPago: [], // <-- FIX: presente aunque vacío (el schema real ya lo tiene)
   }));
 }
 
