@@ -388,6 +388,17 @@ export interface MappedTarifa {
   Descuento: number;
   hotel: string;
   FormaPago: any[];
+  // FIX (2do bug): NvaReservaComponent.roomRates() filtra TODAS las tarifas
+  // (sin excepción para 'Tarifa Base') comparando contra Llegada/Salida:
+  //   return this.intialDate <= salidaDate && this.endDate >= llegadaDate
+  // Si estos campos vienen undefined, `new Date(undefined)` = Invalid Date,
+  // y cualquier comparación contra Invalid Date da `false` -- la Tarifa Base
+  // queda excluida SIEMPRE del selector de tarifas al hacer una reserva,
+  // aunque sí aparezca bien en la pantalla de administración de Tarifas
+  // (que no aplica ese filtro). Les damos un rango amplísimo para que la
+  // condición sea sencillamente siempre verdadera.
+  Llegada: Date;
+  Salida: Date;
 }
 
 function defaultVisibilidad(): MappedTarifaVisibilidad {
@@ -442,6 +453,8 @@ export function mapTarifas(
     Descuento: 0,
     hotel: hotelId,
     FormaPago: [], // <-- FIX: presente aunque vacío (el schema real ya lo tiene)
+    Llegada: new Date('2000-01-01T00:00:00.000Z'), // <-- FIX: evita exclusión en roomRates()
+    Salida: new Date('2099-12-31T23:59:59.000Z'), // <-- FIX: rango amplísimo, siempre "vigente"
   }));
 }
 
