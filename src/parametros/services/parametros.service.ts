@@ -132,6 +132,7 @@ export class ParametrosService {
           urlMapa: 1,
           paginaWeb: 1,
           whatsapp: 1,
+          ish: 1,
         })
         .lean()
         .exec();
