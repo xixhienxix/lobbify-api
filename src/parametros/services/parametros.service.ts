@@ -133,6 +133,9 @@ export class ParametrosService {
           paginaWeb: 1,
           whatsapp: 1,
           ish: 1,
+          clabe: 1,
+          cuenta: 1,
+          nombre_cuenta: 1,
         })
         .lean()
         .exec();
