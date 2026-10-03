@@ -43,6 +43,10 @@ export class Hotel {
     index: true,
   })
   prefix: string;
+
+  // hotel.model.ts, add:
+  @Prop({ select: false }) // never returned by default queries
+  emailPass?: string; // AES-256-GCM encrypted, NOT plain text
 }
 
 export const HotelSchema = SchemaFactory.createForClass(Hotel);

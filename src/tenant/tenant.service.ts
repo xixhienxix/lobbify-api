@@ -3,6 +3,7 @@ import { createConnection, Connection, Model } from 'mongoose';
 import { environment } from '../environments/environment';
 import { Hotel, HotelSchema } from '../admin/models/hotel.model';
 import { generateHotelPrefix } from './hotel-prefix.utils';
+import { decryptSecret, encryptSecret } from './secret.utils';
 
 @Injectable()
 export class TenantService implements OnModuleInit {
@@ -16,6 +17,36 @@ export class TenantService implements OnModuleInit {
 
     console.log('✅ Admin DB connected');
     await this.preloadHotelConnections();
+  }
+
+  private get hotelModel() {
+    return (this.adminConnection.models['hotels'] ||
+      this.adminConnection.model('hotels', HotelSchema)) as Model<Hotel>;
+  }
+
+  async getHotelMailConfig(hotelId: string) {
+    const hotel = await this.hotelModel
+      .findOne({ hotelId, status: 'active' })
+      .select('+emailPass nombre email')
+      .lean()
+      .exec();
+
+    if (!hotel?.email || !hotel?.emailPass) return null;
+
+    return {
+      nombre: hotel.nombre,
+      user: hotel.email.trim(),
+      pass: decryptSecret(hotel.emailPass),
+    };
+  }
+
+  async setHotelEmailPass(hotelId: string, plainPass: string) {
+    // Gmail shows app passwords with spaces; strip them
+    const res = await this.hotelModel.updateOne(
+      { hotelId },
+      { $set: { emailPass: encryptSecret(plainPass.replace(/\s+/g, '')) } },
+    );
+    return res.matchedCount > 0;
   }
 
   private async preloadHotelConnections() {

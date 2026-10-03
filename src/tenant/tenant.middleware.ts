@@ -27,6 +27,7 @@ export class TenantMiddleware implements NestMiddleware {
       '/admin-import.html',
       '/reservations/resolve',
       '/hotel/prefix',
+      '/admin/hotels',
     ];
 
     const matched = openRoutes.some((route) =>

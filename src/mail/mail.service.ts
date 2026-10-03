@@ -3,12 +3,23 @@ import * as nodemailer from 'nodemailer';
 import { EmailModel } from './email.model';
 import { ConfigService } from '@nestjs/config';
 import { DateTime } from 'luxon';
+import { TenantService } from 'src/tenant/tenant.service';
 @Injectable()
 export class MailService {
   private transporter;
+  // Platform sender (Lobify welcome emails) — still uses env
+  private platformTransporter;
+  // Per-hotel transporters, rebuilt automatically if credentials change
+  private hotelTransporters = new Map<
+    string,
+    { transporter: any; user: string; pass: string }
+  >();
 
-  constructor(private configService: ConfigService) {
-    this.transporter = nodemailer.createTransport({
+  constructor(
+    private configService: ConfigService,
+    private tenantService: TenantService,
+  ) {
+    this.platformTransporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: this.configService.get<string>('EMAIL_USER'),
@@ -17,38 +28,73 @@ export class MailService {
     });
   }
 
-  async sendEmail(payload: EmailModel) {
+  private async getHotelTransporter(hotelId: string) {
+    const cfg = await this.tenantService.getHotelMailConfig(hotelId);
+    if (!cfg) {
+      throw new HttpException(
+        `Email credentials are not configured for hotel "${hotelId}"`,
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
+    }
+
+    let entry = this.hotelTransporters.get(hotelId);
+    if (!entry || entry.user !== cfg.user || entry.pass !== cfg.pass) {
+      entry = {
+        transporter: nodemailer.createTransport({
+          service: 'gmail',
+          auth: { user: cfg.user, pass: cfg.pass },
+        }),
+        user: cfg.user,
+        pass: cfg.pass,
+      };
+      this.hotelTransporters.set(hotelId, entry);
+    }
+
+    return {
+      transporter: entry.transporter,
+      user: entry.user,
+      hotelNombre: cfg.nombre,
+    };
+  }
+
+  async sendEmail(hotelId: string, payload: EmailModel) {
     const { to, subject, reservationCode, nombre, folio, llegada, salida } =
       payload;
 
-    const from = this.configService.get<string>('EMAIL_FROM');
+    const { transporter, user, hotelNombre } = await this.getHotelTransporter(
+      hotelId,
+    );
 
-    // ── Format dates in Spanish ──
     const formatDate = (isoString: string): string => {
-      return DateTime.fromISO(isoString)
-        .setLocale('es')
-        .toFormat('dd MMMM yyyy');
+      const dt = DateTime.fromISO(isoString);
+      return dt.isValid
+        ? dt.setLocale('es').toFormat('dd MMMM yyyy')
+        : isoString;
     };
 
-    const llegadaFormatted = formatDate(llegada); // → "21 febrero 2026"
-    const salidaFormatted = formatDate(salida); // → "23 febrero 2026"
-
     const html = `
-    <h2>Hola ${nombre},</h2>
-    <p>Gracias por tu preferencia.</p>
-    <p>Tus reservaciones cuentan con los siguientes folios: <strong>${folio}</strong>.</p>
-    <p>Fecha de llegada: <strong>${llegadaFormatted}</strong>.</p>
-    <p>Fecha de salida: <strong>${salidaFormatted}</strong>.</p>
-    <p>Tu código de reservación es: <strong>${reservationCode}</strong></p>
-  `;
-
-    const mailOptions = { from, to, subject, html };
+      <h2>Hola ${nombre},</h2>
+      <p>Gracias por elegir <strong>${hotelNombre}</strong>.</p>
+      <p>Tus reservaciones cuentan con los siguientes folios: <strong>${folio}</strong>.</p>
+      <p>Fecha de llegada: <strong>${formatDate(llegada)}</strong>.</p>
+      <p>Fecha de salida: <strong>${formatDate(salida)}</strong>.</p>
+      <p>Tu código de reservación es: <strong>${reservationCode}</strong></p>
+    `;
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      const info = await transporter.sendMail({
+        from: `"${hotelNombre}" <${user}>`,
+        to,
+        subject,
+        html,
+      });
       return { message: 'Email sent successfully', messageId: info.messageId };
-    } catch (error) {
-      console.error('Error sending email:', error);
+    } catch (error: any) {
+      console.error('Error sending email:', {
+        hotelId,
+        code: error.code,
+        response: error.response,
+      });
       throw new HttpException(
         'Failed to send email. Please try again later.',
         HttpStatus.INTERNAL_SERVER_ERROR,

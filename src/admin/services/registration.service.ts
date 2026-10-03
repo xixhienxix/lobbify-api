@@ -75,7 +75,7 @@ export class RegistrationService {
         nombre: dto.nombre,
         password: dto.password,
         hotelId,
-        loginUrl: 'https://lobify-front.web.app/auth/login',
+        loginUrl: 'https://app.lobify.mx/auth/login',
       });
 
       return { message: 'Hotel registered successfully', hotelId };

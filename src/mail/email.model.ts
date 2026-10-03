@@ -8,9 +8,6 @@ export class EmailModel extends huesped {
   to: string;
 
   @IsNotEmpty()
-  from: string;
-
-  @IsNotEmpty()
   subject: string;
 
   @Prop()

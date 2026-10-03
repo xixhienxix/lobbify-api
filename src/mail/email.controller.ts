@@ -1,5 +1,5 @@
 // mail.controller.ts
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Headers } from '@nestjs/common';
 import { MailService } from './mail.service';
 import { EmailModel } from './email.model';
 
@@ -7,9 +7,11 @@ import { EmailModel } from './email.model';
 export class MailController {
   constructor(private readonly mailService: MailService) {}
 
-  @Post('send') // 👈 Handles POST /mail/send
-  async sendEmail(@Body() payload: EmailModel) {
-    await this.mailService.sendEmail(payload);
-    return { message: 'Email sent successfully' };
+  @Post('send')
+  async sendEmail(
+    @Headers('x-hotel-id') hotelId: string,
+    @Body() payload: EmailModel,
+  ) {
+    return this.mailService.sendEmail(hotelId, payload);
   }
 }
