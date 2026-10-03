@@ -111,6 +111,19 @@ export class TenantService implements OnModuleInit {
     console.log(`✅ Hotel registered: ${hotelData.hotelId}`);
   }
 
+  async getHotelPrefix(hotelId: string): Promise<string | null> {
+    const hotelModel = (this.adminConnection.models['hotels'] ||
+      this.adminConnection.model('hotels', HotelSchema)) as Model<Hotel>;
+
+    const hotel = await hotelModel
+      .findOne({ hotelId, status: 'active' })
+      .select('prefix')
+      .lean()
+      .exec();
+
+    return hotel?.prefix ?? null;
+  }
+
   getAdminConnection(): Connection {
     return this.adminConnection;
   }
