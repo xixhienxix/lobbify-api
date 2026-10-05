@@ -26,7 +26,10 @@ export class MailService {
     private tenantService: TenantService,
   ) {
     this.platformTransporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: this.configService.get<string>('EMAIL_HOST') ?? 'smtp.gmail.com',
+      port: Number(this.configService.get<string>('EMAIL_PORT') ?? 465),
+      secure:
+        (this.configService.get<string>('EMAIL_SECURE') ?? 'true') === 'true',
       auth: {
         user: this.configService.get<string>('EMAIL_USER'),
         pass: this.configService.get<string>('EMAIL_PASS'),
@@ -52,7 +55,7 @@ export class MailService {
 
       const p: any = await model
         .findOne()
-        .select('+emailPass emailUser')
+        .select('+emailPass emailUser emailHost emailPort emailSecure')
         .lean()
         .exec();
 
@@ -60,15 +63,20 @@ export class MailService {
 
       const user = p.emailUser.trim();
       const pass = decryptSecret(p.emailPass);
+      const host = p.emailHost?.trim() || '';
+      const port = p.emailPort || 465;
+      const secure = p.emailSecure ?? port === 465;
+      const key = `${user}|${host}|${port}|${secure}`;
 
       let entry = this.hotelTransporters.get(hotelId);
-      if (!entry || entry.user !== user || entry.pass !== pass) {
+      if (!entry || entry.user !== key || entry.pass !== pass) {
         entry = {
-          transporter: nodemailer.createTransport({
-            service: 'gmail',
-            auth: { user, pass },
-          }),
-          user,
+          transporter: nodemailer.createTransport(
+            host
+              ? { host, port, secure, auth: { user, pass } }
+              : { service: 'gmail', auth: { user, pass } }, // no host saved -> Gmail
+          ),
+          user: key, // the cache key doubles as the change detector
           pass,
         };
         this.hotelTransporters.set(hotelId, entry);

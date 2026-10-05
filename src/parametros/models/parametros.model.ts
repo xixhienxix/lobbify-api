@@ -66,6 +66,10 @@ export class Parametros {
   @Prop({ type: String, select: false }) // encrypted, never returned by default
   emailPass?: string;
 
+  @Prop({ type: String, trim: true }) emailHost?: string;
+  @Prop({ type: Number }) emailPort?: number;
+  @Prop({ type: Boolean }) emailSecure?: boolean;
+
   @Prop({
     type: String,
     enum: ['percentage', 'quantity'],

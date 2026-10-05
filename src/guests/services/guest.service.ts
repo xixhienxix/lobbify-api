@@ -407,6 +407,8 @@ export class GuestService {
       ...huespedArr.map((h) => parseInt(h.folio.substring(1), 10)),
     );
 
+    const width = Math.max(...huespedArr.map((h) => h.folio.length - 1));
+
     const updatePromises = huespedArr.map(async (element) => {
       try {
         const data = await this.guestModel.create(element);
@@ -424,7 +426,7 @@ export class GuestService {
     try {
       const foliadorUpdateResult = await this.foliadorModel.findOneAndUpdate(
         { Letra: letra },
-        { Folio: `${maxFolioNumber + 1}` },
+        { Folio: String(maxFolioNumber + 1).padStart(width, '0') },
         { new: true },
       );
 
