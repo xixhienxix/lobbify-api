@@ -58,7 +58,13 @@ export class Parametros {
   multa: number;
   @Prop()
   whatsapp: string;
-  /** DEPÓSITO POR RESERVACIÓN */
+
+  /** CORREO PARA CONFIRMACIONES */
+  @Prop({ type: String, trim: true })
+  emailUser?: string;
+
+  @Prop({ type: String, select: false }) // encrypted, never returned by default
+  emailPass?: string;
 
   @Prop({
     type: String,

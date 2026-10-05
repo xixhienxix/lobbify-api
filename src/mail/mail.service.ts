@@ -4,6 +4,12 @@ import { EmailModel } from './email.model';
 import { ConfigService } from '@nestjs/config';
 import { DateTime } from 'luxon';
 import { TenantService } from 'src/tenant/tenant.service';
+import { Connection, Model } from 'mongoose';
+import {
+  Parametros,
+  ParametrosSchema,
+} from 'src/parametros/models/parametros.model';
+import { decryptSecret } from 'src/tenant/secret.utils';
 @Injectable()
 export class MailService {
   private transporter;
@@ -26,6 +32,43 @@ export class MailService {
         pass: this.configService.get<string>('EMAIL_PASS'),
       },
     });
+  }
+
+  /** Reads the hotel's own sender from its Parametros. Null if not configured. */
+  private async getHotelSender(hotelId: string, connection: Connection) {
+    try {
+      const model: Model<Parametros> =
+        (connection.models['Parametros'] as Model<Parametros>) ||
+        connection.model('Parametros', ParametrosSchema);
+
+      const p: any = await model
+        .findOne()
+        .select('+emailPass emailUser')
+        .lean()
+        .exec();
+
+      if (!p?.emailUser?.trim() || !p?.emailPass) return null;
+
+      const user = p.emailUser.trim();
+      const pass = decryptSecret(p.emailPass);
+
+      let entry = this.hotelTransporters.get(hotelId);
+      if (!entry || entry.user !== user || entry.pass !== pass) {
+        entry = {
+          transporter: nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user, pass },
+          }),
+          user,
+          pass,
+        };
+        this.hotelTransporters.set(hotelId, entry);
+      }
+      return { transporter: entry.transporter, user };
+    } catch (e: any) {
+      console.error(`Could not load mail config for ${hotelId}:`, e.message);
+      return null;
+    }
   }
 
   private async getHotelTransporter(hotelId: string) {
@@ -57,19 +100,19 @@ export class MailService {
     };
   }
 
-  async sendEmail(hotelId: string, payload: EmailModel) {
+  async sendEmail(
+    hotelId: string,
+    connection: Connection,
+    payload: EmailModel,
+  ) {
     const { to, subject, reservationCode, nombre, folio, llegada, salida } =
       payload;
 
-    const { transporter, user, hotelNombre } = await this.getHotelTransporter(
-      hotelId,
-    );
+    const hotelNombre = await this.tenantService.getHotelNombre(hotelId);
 
-    const formatDate = (isoString: string): string => {
-      const dt = DateTime.fromISO(isoString);
-      return dt.isValid
-        ? dt.setLocale('es').toFormat('dd MMMM yyyy')
-        : isoString;
+    const formatDate = (iso: string): string => {
+      const dt = DateTime.fromISO(iso);
+      return dt.isValid ? dt.setLocale('es').toFormat('dd MMMM yyyy') : iso;
     };
 
     const html = `
@@ -81,17 +124,45 @@ export class MailService {
       <p>Tu código de reservación es: <strong>${reservationCode}</strong></p>
     `;
 
+    // 1) Try the hotel's own email
+    const hotelSender = await this.getHotelSender(hotelId, connection);
+    if (hotelSender) {
+      try {
+        const info = await hotelSender.transporter.sendMail({
+          from: `"${hotelNombre}" <${hotelSender.user}>`,
+          to,
+          subject,
+          html,
+        });
+        return {
+          message: 'Email sent successfully',
+          via: 'hotel',
+          messageId: info.messageId,
+        };
+      } catch (error: any) {
+        console.error('Hotel SMTP failed, falling back to platform:', {
+          hotelId,
+          code: error.code,
+          response: error.response,
+        });
+      }
+    }
+
+    // 2) Fallback: platform account from .env
     try {
-      const info = await transporter.sendMail({
-        from: `"${hotelNombre}" <${user}>`,
+      const info = await this.platformTransporter.sendMail({
+        from: this.configService.get<string>('EMAIL_FROM'),
         to,
         subject,
         html,
       });
-      return { message: 'Email sent successfully', messageId: info.messageId };
+      return {
+        message: 'Email sent successfully',
+        via: 'platform',
+        messageId: info.messageId,
+      };
     } catch (error: any) {
-      console.error('Error sending email:', {
-        hotelId,
+      console.error('Platform SMTP failed:', {
         code: error.code,
         response: error.response,
       });

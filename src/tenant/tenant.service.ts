@@ -49,6 +49,17 @@ export class TenantService implements OnModuleInit {
     return res.matchedCount > 0;
   }
 
+  async getHotelNombre(hotelId: string): Promise<string> {
+    const hotelModel = (this.adminConnection.models['hotels'] ||
+      this.adminConnection.model('hotels', HotelSchema)) as Model<Hotel>;
+    const hotel = await hotelModel
+      .findOne({ hotelId })
+      .select('nombre')
+      .lean()
+      .exec();
+    return hotel?.nombre ?? hotelId;
+  }
+
   private async preloadHotelConnections() {
     const hotelModel = (this.adminConnection.models['hotels'] ||
       this.adminConnection.model('hotels', HotelSchema)) as Model<Hotel>;

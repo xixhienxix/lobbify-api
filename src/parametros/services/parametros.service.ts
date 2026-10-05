@@ -12,6 +12,7 @@ import { Request } from 'express';
 import { Connection, Model } from 'mongoose';
 import { Parametros, ParametrosSchema } from '../models/parametros.model';
 import { HotelSchedulerService } from 'src/scheduler/scheduler.tasks';
+import { encryptSecret } from 'src/tenant/secret.utils'; // adjust path
 
 @Injectable({ scope: Scope.REQUEST })
 export class ParametrosService {
@@ -32,7 +33,7 @@ export class ParametrosService {
   async getAll(
     role: string,
     restrictedFields: readonly string[],
-  ): Promise<Parametros> {
+  ): Promise<any> {
     const projection =
       role === 'ADMIN'
         ? {}
@@ -45,7 +46,15 @@ export class ParametrosService {
         .exec();
 
       if (!data) throw new NotFoundException('No parametros found');
-      return data;
+
+      // Tell the UI whether a password exists without revealing it
+      const withPass = await this.parametrosModel
+        .findOne({ emailPass: { $exists: true, $nin: [null, ''] } })
+        .select('_id')
+        .lean()
+        .exec();
+
+      return { ...data, emailPassSet: !!withPass };
     } catch (error: any) {
       if (error instanceof NotFoundException) throw error;
       this.logger.error(
@@ -101,14 +110,36 @@ export class ParametrosService {
   async postParametros(body: any) {
     const hotelId = (this.request as any).hotelId;
     try {
+      const { emailPass, emailPassSet, ...params } = body.parametros;
+
+      // Keep the stored password unless a new one was sent
+      const existing = await this.parametrosModel
+        .findOne()
+        .select('+emailPass')
+        .lean()
+        .exec();
+      let storedPass: string | undefined = existing?.emailPass;
+
+      if (typeof emailPass === 'string' && emailPass.trim()) {
+        storedPass = encryptSecret(emailPass.replace(/\s+/g, ''));
+      }
+      // Clearing the email address also clears the password
+      if (!params.emailUser?.trim()) storedPass = undefined;
+
       await this.parametrosModel.deleteOne({});
-      const newParametros = new this.parametrosModel(body.parametros);
+      const newParametros = new this.parametrosModel({
+        ...params,
+        ...(storedPass && { emailPass: storedPass }),
+      });
       const data = await newParametros.save();
+
       await this.hotelSchedulerService.updateHotelSchedule(
         hotelId,
-        body.parametros.checkOut,
+        params.checkOut,
       );
-      return data;
+
+      const { emailPass: _omit, ...safe } = data.toObject();
+      return safe;
     } catch (err) {
       console.log(err);
       return err;
