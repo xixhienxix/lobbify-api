@@ -34,6 +34,15 @@ export class MailService {
     });
   }
 
+  async onModuleInit() {
+    try {
+      await this.platformTransporter.verify();
+      console.log('✅ Platform SMTP ready');
+    } catch (e: any) {
+      console.error('❌ Platform SMTP verify failed:', e.code, e.response);
+    }
+  }
+
   /** Reads the hotel's own sender from its Parametros. Null if not configured. */
   private async getHotelSender(hotelId: string, connection: Connection) {
     try {
