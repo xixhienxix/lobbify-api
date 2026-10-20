@@ -19,7 +19,7 @@ export class ReservationAuthService {
 
   async resolveCode(rawCode: string) {
     const code = (rawCode ?? '').trim().toUpperCase();
-    const match = /^([A-Z]{2,4})-(.+)$/.exec(code);
+    const match = /^([A-Z0-9]{2,6})-(.+)$/.exec(code);
     if (!match) throw new BadRequestException('Código inválido.');
     const [, prefix, folio] = match;
 
