@@ -1,15 +1,30 @@
 // dto/send-email.dto.ts
-import { Prop } from '@nestjs/mongoose';
-import { IsEmail, IsNotEmpty } from 'class-validator';
-import { huesped } from 'src/auth/models/huesped.model';
+import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
-export class EmailModel extends huesped {
+export class EmailModel {
   @IsEmail()
   to: string;
 
   @IsNotEmpty()
+  @IsString()
   subject: string;
 
-  @Prop()
+  @IsString()
+  nombre: string;
+
+  @IsString()
+  folio: string;
+
+  @IsString()
+  llegada: string;
+
+  @IsString()
+  salida: string;
+
+  @IsString()
   reservationCode: string;
+
+  @IsOptional()
+  @IsString()
+  hotel?: string;
 }
